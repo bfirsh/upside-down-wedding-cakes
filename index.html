@@ -9,7 +9,7 @@
 :root{
   --bg:#0d1117; --panel:rgba(17,22,30,.92); --line:rgba(255,255,255,.10);
   --txt:#e8edf4; --dim:#93a1b5; --acc:#5aa9e6;
-  --B:#4b8fd6; --C:#c9569c; --D:#3fc3da; --E:#c58ab4; --SUA:#e0614f;
+  --B:#3987e5; --C:#d55181; --D:#c98500; --E:#8e8d85; --SUA:#e34948;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
@@ -86,6 +86,9 @@ button.wide.on{background:#ffd24a;border-color:#ffd24a;color:#1a1405}
 .res:hover{background:rgba(255,255,255,.10)}
 .res b{color:var(--acc);font-variant-numeric:tabular-nums;min-width:34px}
 .res span{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ramp{display:flex;align-items:center;gap:7px;margin:9px 0 2px;font-size:10px;color:var(--dim)}
+.ramp i{flex:1;height:7px;border-radius:4px;
+  background:linear-gradient(90deg,#9ecbf5,#4f93d8,#14528f)}
 .tip{font-size:10.5px;color:#6f7f94;margin-top:6px;line-height:1.4}
 #inside{font-size:11.5px;color:var(--dim);margin-top:8px;min-height:16px}
 #inside b{color:var(--txt)}
@@ -132,6 +135,26 @@ button.wide.on{background:#ffd24a;border-color:#ffd24a;color:#1a1405}
 .maplibregl-ctrl-group button .maplibregl-ctrl-icon{filter:invert(1) brightness(1.6);transform:scale(1.15)}
 #map.orbit .maplibregl-canvas{cursor:grab}
 #map.orbit.dragging .maplibregl-canvas{cursor:grabbing}
+#nav{position:absolute;right:18px;bottom:52px;z-index:6;display:flex;align-items:flex-end;gap:10px;
+  touch-action:none;user-select:none}
+#compass{width:104px;height:104px;cursor:grab;filter:drop-shadow(0 6px 18px rgba(0,0,0,.6))}
+#compass.drag{cursor:grabbing}
+#compass svg{width:100%;height:100%;display:block}
+#compass .ring{fill:rgba(17,22,30,.82);stroke:rgba(255,255,255,.18);stroke-width:2}
+#compass:hover .ring{stroke:rgba(255,255,255,.34)}
+#compass .nd{fill:#e0614f}
+#compass .nl{fill:#e8edf4;font:700 15px -apple-system,sans-serif;text-anchor:middle}
+#compass .tick{stroke:rgba(255,255,255,.30);stroke-width:2.5;stroke-linecap:round}
+#compass .hub{fill:rgba(255,255,255,.10);stroke:rgba(255,255,255,.22);stroke-width:1.5}
+#tilt{position:relative;width:26px;height:104px;border-radius:13px;cursor:ns-resize;
+  background:rgba(17,22,30,.82);border:1px solid rgba(255,255,255,.18);overflow:hidden;
+  box-shadow:0 6px 18px rgba(0,0,0,.6)}
+#tiltFill{position:absolute;left:0;right:0;bottom:0;background:rgba(90,169,230,.30)}
+#tiltKnob{position:absolute;left:3px;right:3px;height:6px;border-radius:3px;background:var(--acc);
+  box-shadow:0 1px 4px rgba(0,0,0,.6)}
+#tilt .tl{position:absolute;bottom:5px;left:0;right:0;text-align:center;font-size:8px;
+  letter-spacing:.06em;color:var(--dim);pointer-events:none}
+@media (max-width:640px){ #nav{right:10px;bottom:78px;transform:scale(.86);transform-origin:bottom right} }
 #hint{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:4;
   background:rgba(17,22,30,.86);border:1px solid var(--line);border-radius:20px;
   padding:6px 14px;font-size:11.5px;color:var(--dim);pointer-events:none;
@@ -157,72 +180,35 @@ button.wide.on{background:#ffd24a;border-color:#ffd24a;color:#1a1405}
   <label class="chk"><input type="checkbox" data-cls="B" checked><span class="sw" style="background:var(--B)"></span>Class B <span class="cnt" id="nB">–</span></label>
   <label class="chk"><input type="checkbox" data-cls="C" checked><span class="sw" style="background:var(--C)"></span>Class C <span class="cnt" id="nC">–</span></label>
   <label class="chk"><input type="checkbox" data-cls="D" checked><span class="sw" style="background:var(--D)"></span>Class D <span class="cnt" id="nD">–</span></label>
+  <label class="chk"><input type="checkbox" data-cls="SUA" checked><span class="sw" style="background:var(--SUA)"></span>Restricted · MOA <span class="cnt" id="nSUA">–</span></label>
   <label class="chk"><input type="checkbox" data-cls="E"><span class="sw" style="background:var(--E)"></span>Class E surface <span class="cnt" id="nE">–</span></label>
-  <label class="chk"><input type="checkbox" data-cls="SUA" checked><span class="sw" style="background:var(--SUA)"></span>Restricted · MOA · Alert <span class="cnt" id="nSUA">–</span></label>
+  <div class="ramp"><span>floor SFC</span><i></i><span>10,000</span></div>
 
-  <h2>Vertical</h2>
-  <div class="sl"><div class="lb"><span>Exaggeration</span><span id="exagV">10×</span></div>
-    <input type="range" id="exag" min="1" max="24" step="0.5" value="10"></div>
-  <div class="sl"><div class="lb"><span>Opacity</span><span id="opV">75%</span></div>
-    <input type="range" id="op" min="8" max="95" step="1" value="75"></div>
-  <label class="chk"><input type="checkbox" id="hollow">Hollow shells — floor &amp; ceiling only</label>
-  <label class="chk"><input type="checkbox" id="evenOp">Same opacity for every class</label>
-  <div class="tip">By default Class B is drawn thinner than Class C and D, so the small
-    low airspace underneath still reads. Turn on hollow shells to see right through a stack.</div>
-
-  <h2>Your altitude</h2>
-  <div class="sl"><div class="lb"><span>MSL</span><span id="altV">3,500 ft</span></div>
-    <input type="range" id="alt" min="0" max="12000" step="100" value="3500"></div>
-  <label class="chk"><input type="checkbox" id="clip">Cut away everything above it</label>
-  <label class="chk"><input type="checkbox" id="plane">Show altitude plane</label>
-  <label class="chk"><input type="checkbox" id="slice">Highlight airspace at that altitude</label>
+  <h2>Cut away</h2>
+  <div class="sl"><div class="lb"><span>Hide everything above</span><span id="altV">3,500 ft</span></div>
+    <input type="range" id="alt" min="500" max="12000" step="100" value="3500"></div>
+  <label class="chk"><input type="checkbox" id="clip">Slice the sky here</label>
   <div id="inside"></div>
-  <div class="tip">Cutting away is the quickest way to see a Class D that's buried under
-    a Bravo shelf — set it to 2,000 ft and the lid comes off.</div>
-
-  <h2>Camera</h2>
-  <div class="sl"><div class="lb"><span>Tilt</span><span id="pitchV">76°</span></div>
-    <input type="range" id="pitch" min="0" max="85" step="1" value="76"></div>
-  <div class="sl"><div class="lb"><span>Rotate</span><span id="bearV">0°</span></div>
-    <input type="range" id="bear" min="-180" max="180" step="1" value="0"></div>
-  <div class="btns">
-    <button id="rotL">↺ 30°</button>
-    <button id="rotR">30° ↻</button>
-    <button id="north">North up</button>
-  </div>
-  <button id="dragMode" class="wide">✋ Drag to pan</button>
-  <div class="tip">Or right-drag anywhere · shift + scroll to spin · alt + scroll to tilt</div>
 
   <h2>Go to</h2>
-  <input id="q" type="search" placeholder="Airport code or name — SFO, ASE, Teterboro…" autocomplete="off" spellcheck="false">
+  <input id="q" type="search" placeholder="Airport code or name — SFO, ASE…" autocomplete="off" spellcheck="false">
   <div id="results"></div>
-  <div class="btns" style="margin-top:6px">
-    <button data-frame="over">Overhead</button>
-    <button data-frame="tilt">Tilted</button>
-    <button data-frame="low" class="on">Low</button>
-    <button data-frame="profile">Profile</button>
-  </div>
-  <button id="home" class="wide">Back to the Bay Area</button>
 
   <h2>Basemap</h2>
   <div class="btns">
     <button data-base="sectional" class="on">Sectional</button>
     <button data-base="tac">TAC</button>
     <button data-base="sat">Satellite</button>
-    <button data-base="topo">Topo</button>
-    <button data-base="none">None</button>
+    <button data-base="none">Off</button>
   </div>
 
-  <h2>Extras</h2>
-  <label class="chk"><input type="checkbox" id="apts" checked>Airport markers</label>
-  <label class="chk"><input type="checkbox" id="labels">Ceiling / floor labels</label>
-
   <div class="note">
-    Covers the whole United States. Volumes are drawn from <b>floor to ceiling in feet
-    MSL</b>, queried live from the FAA Aeronautical Information Services feed for
-    whatever you're looking at, and refreshed on the 28-day chart cycle. Heights are
-    exaggerated — read the numbers, not the apparent size. The ground is flat at sea
-    level, so terrain is not modelled.<br><br>
+    Each volume runs from its <b>floor to its ceiling in feet MSL</b>, with bright
+    plates marking both. Within a class, pale means a low floor and dark a high one.
+    Labels read ceiling/floor in hundreds, so <b>100/15</b> is 10,000 down to 1,500.
+    Heights are exaggerated 10× — read the numbers, not the apparent size — and the
+    ground is flat at sea level, so terrain is not modelled.<br><br>
+    Drag the compass to spin, the bar beside it to tilt. Double-click to fly in.<br><br>
     <b>Not for navigation.</b> Verify against current charts and NOTAMs.<br><br>
     Airspace and charts: <a href="https://adds-faa.opendata.arcgis.com/" target="_blank"
     rel="noopener">FAA Aeronautical Information Services</a>. Airports:
@@ -230,6 +216,25 @@ button.wide.on{background:#ffd24a;border-color:#ffd24a;color:#1a1405}
     Built with <a href="https://maplibre.org/" target="_blank" rel="noopener">MapLibre GL</a>.
     <a href="https://github.com/bfirsh/upside-down-wedding-cakes" target="_blank"
     rel="noopener">Source on GitHub</a>.
+  </div>
+</div>
+
+<div id="nav">
+  <div id="tilt" title="Drag to tilt">
+    <div id="tiltFill"></div><div id="tiltKnob"></div><span class="tl">tilt</span>
+  </div>
+  <div id="compass" title="Drag to rotate · double-click for north up">
+    <svg viewBox="0 0 100 100">
+      <circle class="ring" cx="50" cy="50" r="44"/>
+      <g id="rose">
+        <path class="nd" d="M50 8 L57 26 L50 22 L43 26 Z"/>
+        <text class="nl" x="50" y="40">N</text>
+        <line class="tick" x1="50" y1="88" x2="50" y2="80"/>
+        <line class="tick" x1="12" y1="50" x2="20" y2="50"/>
+        <line class="tick" x1="88" y1="50" x2="80" y2="50"/>
+      </g>
+      <circle class="hub" cx="50" cy="50" r="13"/>
+    </svg>
   </div>
 </div>
 
@@ -303,20 +308,52 @@ const MIN_ZOOM = 6;          // below this, don't hammer the FAA service
 const MAX_BOX = 7;           // degrees – clamp the query envelope
 const MAX_FEATURES = 6000;   // memory guard; past this we reset and reload the view
 
-// `w` scales the master opacity per class. Class B is a huge lid over everything,
-// so it gets thinned hard; Class D is small and lives underneath, so it stays solid.
+// Palette validated with the dataviz skill's checker (dark surface, --pairs all,
+// which is the right test because every class is on screen at once):
+// blue/magenta/yellow passes CVD and normal-vision separation on all pairs.
+// Blue-B and magenta-C also match sectional convention. Class D is yellow rather
+// than the chart's dashed blue, which would be indistinguishable from Class B here.
+// SUA is a status colour, not a categorical slot — it always ships with a label.
 const CLASSES = {
-  B:   { color: '#1d5fa8', on: true,  w: 0.40 },
-  C:   { color: '#9c2c6f', on: true,  w: 0.62 },
-  D:   { color: '#1e9ab0', on: true,  w: 1.00 },
-  E:   { color: '#a05a8c', on: false, w: 0.85 },
-  SUA: { color: '#c0392b', on: true,  w: 0.70 }
+  B:   { on: true,  lo: '#9ecbf5', hi: '#14528f', w: 0.42, label: 'Class B' },
+  C:   { on: true,  lo: '#f0aac4', hi: '#8e2f56', w: 0.60, label: 'Class C' },
+  D:   { on: true,  lo: '#f2cf82', hi: '#8a5b00', w: 0.85, label: 'Class D' },
+  E:   { on: false, lo: '#c3c2b7', hi: '#6b6a63', w: 0.60, label: 'Class E surface' },
+  SUA: { on: true,  lo: '#f2a9a9', hi: '#a32d2c', w: 0.70, label: 'Restricted / MOA' }
 };
-// paint order — later is drawn on top, so the small low stuff wins
-const DRAW = ['B', 'C', 'SUA', 'E', 'D'];
-const opacityFor = c => Math.min(0.95, state.opacity * (state.evenOp ? 1 : CLASSES[c].w));
+// Within a class, floor altitude drives lightness: low shelves light, high shelves
+// dark. That is what turns a fused blue lump into readable tiers.
+const rampFor = c => ['interpolate', ['linear'], ['get', 'low'],
+  0,    CLASSES[c].lo,
+  1500, mix(CLASSES[c].lo, CLASSES[c].hi, 0.30),
+  2500, mix(CLASSES[c].lo, CLASSES[c].hi, 0.50),
+  4000, mix(CLASSES[c].lo, CLASSES[c].hi, 0.70),
+  6000, mix(CLASSES[c].lo, CLASSES[c].hi, 0.86),
+  9000, CLASSES[c].hi];
 
-const HOME = { center: [-122.25, 37.55], zoom: 8.35, pitch: 76, bearing: 0 };
+function mix(a, b, t) {
+  const h = s => [1, 3, 5].map(i => parseInt(s.substr(i, 2), 16));
+  const [r1, g1, b1] = h(a), [r2, g2, b2] = h(b);
+  const c = v => Math.round(v).toString(16).padStart(2, '0');
+  return '#' + c(r1 + (r2 - r1) * t) + c(g1 + (g2 - g1) * t) + c(b1 + (b2 - b1) * t);
+}
+
+// later is drawn on top, so the small low stuff wins
+const DRAW = ['B', 'C', 'SUA', 'E', 'D'];
+// Keep the airspace stack a roughly constant fraction of how wide the view is.
+// Zoomed out over a whole region 10,000 ft is a rounding error and needs stretching;
+// zoomed in on one field the camera sits low and a stretched Bravo swallows it, so
+// the factor has to come DOWN. Both ends are wrong with any fixed number.
+function exagAuto() {
+  const px = map.getCanvas().clientWidth || 1200;
+  const mpp = 156543.03 * Math.cos(map.getCenter().lat * Math.PI / 180) / Math.pow(2, map.getZoom());
+  const viewM = mpp * px;
+  return Math.max(1.2, Math.min(14, 0.055 * viewM / 3048));
+}
+
+const opacityFor = c => Math.min(0.97, state.opacity * (state.evenOp ? 1 : CLASSES[c].w));
+
+const HOME = { center: [-122.28, 37.56], zoom: 9.05, pitch: 66, bearing: 335 };
 const FRAMES = {
   over:    { pitch: 15 },
   tilt:    { pitch: 70 },
@@ -325,9 +362,9 @@ const FRAMES = {
 };
 
 const state = {
-  exag: 10, opacity: 0.75, alt: 3500,
-  planeOn: false, sliceOn: false, labelsOn: false, airportsOn: true,
-  orbitDrag: false, hollow: false, evenOp: false, clipOn: false,
+  exag: 5, opacity: 0.20, alt: 3500,
+  planeOn: false, sliceOn: false, labelsOn: true, airportsOn: true,
+  orbitDrag: false, shape: 'solid', footOn: true, evenOp: false, clipOn: false,
   snapshot: null,            // data/index.json when a baked dataset is present
   tilesLoaded: new Set(),
   feats: new Map(),          // dedupe key -> feature
@@ -367,8 +404,9 @@ const map = new maplibregl.Map({
   center: HOME.center, zoom: HOME.zoom, pitch: HOME.pitch, bearing: HOME.bearing,
   maxPitch: 85, antialias: true, attributionControl: { compact: true }
 });
+window.map = map;   // handy for debugging and automated screenshots
 map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
-map.addControl(new maplibregl.ScaleControl({ unit: 'imperial' }), 'bottom-right');
+map.addControl(new maplibregl.ScaleControl({ unit: 'imperial' }), 'bottom-left');
 map.addControl(new maplibregl.GeolocateControl({ trackUserLocation: false }), 'top-right');
 
 /* ================= query helpers ================= */
@@ -542,8 +580,8 @@ async function loadTiles() {
   }
   const when = new Date(snap.generated).toLocaleDateString(undefined,
     { year: 'numeric', month: 'short', day: 'numeric' });
-  status('<span class="ok"></span>' + state.feats.size +
-         ' airspace volumes · FAA data of ' + when, 'good');
+  status('<span class="ok"></span>' + state.feats.size + ' volumes · FAA ' + when +
+         ' · heights ×' + state.exag.toFixed(1), 'good');
   counts();
   refresh();
   return true;
@@ -635,7 +673,7 @@ function buildFC() {
       properties: Object.assign({}, f.properties, (() => {
         const lo = f.properties.low * FT * state.exag;
         const hi = Math.min(f.properties.high, clip) * FT * state.exag;
-        const slab = Math.min(28 * state.exag, (hi - lo) * 0.18);
+        const slab = Math.max(12 * state.exag, Math.min(26 * state.exag, (hi - lo) * 0.10));
         return { base: lo, top: hi, fbase: lo, ftop: lo + slab, cbase: hi - slab, ctop: hi };
       })()) });
   });
@@ -645,26 +683,27 @@ function buildFC() {
 function refresh() {
   if (!map.getSource('airspace')) return;
   map.getSource('airspace').setData(buildFC());
+
+  const S = state.shape;                       // solid | shells | floors
   Object.keys(CLASSES).forEach(c => {
     const on = CLASSES[c].on;
-    if (map.getLayer('as-' + c)) {
-      map.setLayoutProperty('as-' + c, 'visibility', on ? 'visible' : 'none');
-      map.setPaintProperty('as-' + c, 'fill-extrusion-opacity', opacityFor(c));
-      map.setPaintProperty('as-' + c, 'fill-extrusion-base',
-        ['get', state.hollow ? 'fbase' : 'base']);
-      map.setPaintProperty('as-' + c, 'fill-extrusion-height',
-        ['get', state.hollow ? 'ftop' : 'top']);
-    }
-    if (map.getLayer('as-' + c + '-cap')) {
-      map.setLayoutProperty('as-' + c + '-cap', 'visibility', (on && state.hollow) ? 'visible' : 'none');
-      map.setPaintProperty('as-' + c + '-cap', 'fill-extrusion-opacity', opacityFor(c));
-    }
+    const vis = v => (on && v) ? 'visible' : 'none';
+    const set = (id, v, op) => {
+      if (!map.getLayer(id)) return;
+      map.setLayoutProperty(id, 'visibility', vis(v));
+      if (op != null) map.setPaintProperty(id, 'fill-extrusion-opacity', op);
+    };
+    set('as-' + c,            S === 'solid',  bodyOp(c));
+    set('as-' + c + '-ceil',  S !== 'floors', rimOp(c) * (S === 'solid' ? 0.7 : 1));
+    set('as-' + c + '-floor', true,           rimOp(c));
+    if (map.getLayer('as-' + c + '-foot'))
+      map.setLayoutProperty('as-' + c + '-foot', 'visibility', vis(state.footOn));
     if (map.getLayer('as-' + c + '-hl')) {
-      map.setLayoutProperty('as-' + c + '-hl', 'visibility', (on && state.sliceOn) ? 'visible' : 'none');
+      map.setLayoutProperty('as-' + c + '-hl', 'visibility', vis(state.sliceOn));
       map.setFilter('as-' + c + '-hl', ['all',
-        ['==', ['get','cls'], c],
-        ['<=', ['get','low'], state.alt],
-        ['>',  ['get','high'], state.alt]]);
+        ['==', ['get', 'cls'], c],
+        ['<=', ['get', 'low'], state.alt],
+        ['>',  ['get', 'high'], state.alt]]);
     }
   });
   updatePlane();
@@ -729,6 +768,8 @@ function makeAirports() {
   });
 }
 
+const swatch = (c, low) => mix(CLASSES[c].lo, CLASSES[c].hi, Math.min(1, (low || 0) / 10000));
+
 function centroid(geom) {
   let x = 0, y = 0, n = 0;
   const walk = c => { if (typeof c[0] === 'number') { x += c[0]; y += c[1]; n++; } else c.forEach(walk); };
@@ -736,55 +777,112 @@ function centroid(geom) {
   return [x / n, y / n];
 }
 
+function areaOf(geom) {
+  let s = 0;
+  const ring = r => { for (let i = 0, n = r.length - 1; i < n; i++)
+    s += r[i][0] * r[i + 1][1] - r[i + 1][0] * r[i][1]; };
+  const walk = c => { if (typeof c[0][0] === 'number') ring(c); else c.forEach(walk); };
+  walk(geom.coordinates);
+  return Math.abs(s);
+}
+
+// DOM markers can't be lifted to a shelf's altitude, so instead of scattering a
+// label on every polygon we place as many as fit without overlapping: biggest and
+// lowest first, then anything that still has room. Re-run on every camera move.
 function updateLabels() {
   labelMarkers.forEach(m => m.remove());
   labelMarkers = [];
   if (!state.labelsOn) return;
-  const b = map.getBounds();
-  let n = 0;
+
+  const W = map.getCanvas().clientWidth, H = map.getCanvas().clientHeight;
+  const cand = [];
   state.feats.forEach(f => {
-    if (n > 120 || !CLASSES[f.properties.cls].on) return;
-    const c = centroid(f.geometry);
-    if (c[0] < b.getWest() || c[0] > b.getEast() || c[1] < b.getSouth() || c[1] > b.getNorth()) return;
+    if (!CLASSES[f.properties.cls].on) return;
+    if (state.clipOn && f.properties.low >= state.alt) return;
+    if (!f._c) { f._c = centroid(f.geometry); f._a = areaOf(f.geometry); }
+    const pt = map.project(f._c);
+    if (pt.x < 60 || pt.y < 20 || pt.x > W - 20 || pt.y > H - 40) return;
+    cand.push({ f, pt });
+  });
+
+  // low floors first (they're the ones hidden under everything), then by size
+  cand.sort((a, b) => (a.f.properties.low - b.f.properties.low) || (b.f._a - a.f._a));
+
+  const placed = [];
+  const CLEAR_X = 46, CLEAR_Y = 17;
+  for (const { f, pt } of cand) {
+    if (placed.length >= 40) break;
+    if (placed.some(q => Math.abs(q.x - pt.x) < CLEAR_X && Math.abs(q.y - pt.y) < CLEAR_Y)) continue;
+    placed.push(pt);
     const el = document.createElement('div');
     el.className = 'shelf c' + f.properties.cls;
     el.textContent = f.properties.shelf;
-    labelMarkers.push(new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(c).addTo(map));
-    n++;
-  });
+    el.title = f.properties.name + ' — ' + f.properties.highLabel + ' down to ' + f.properties.lowLabel;
+    labelMarkers.push(new maplibregl.Marker({ element: el, anchor: 'center' })
+      .setLngLat(f._c).addTo(map));
+  }
 }
 
-/* ================= layers ================= */
+/* ================= layers =================
+   A translucent box on its own is fog: overlap two and you get one blob. What makes
+   a glass solid readable is its EDGES. So every volume is drawn four times —
+   a very faint body, a bright plate at the floor, a softer plate at the ceiling,
+   and its outline on the ground — and the eye reassembles the box from the rims.  */
+
+const bodyOp = c => Math.min(0.55, state.opacity * (state.evenOp ? 1 : CLASSES[c].w));
+const rimOp  = c => Math.min(0.95, 0.42 + bodyOp(c) * 2.2);
+
 function addLayers() {
   DRAW.forEach(c => {
-    const cfg = CLASSES[c];
-    const base = {
-      type:'fill-extrusion', source:'airspace',
-      filter:['==', ['get','cls'], c],
-      paint:{ 'fill-extrusion-color':cfg.color,
-              'fill-extrusion-base':['get','base'],
-              'fill-extrusion-height':['get','top'],
-              'fill-extrusion-opacity':opacityFor(c) }
+    const common = {
+      type: 'fill-extrusion', source: 'airspace',
+      filter: ['==', ['get', 'cls'], c],
+      paint: {
+        'fill-extrusion-color': rampFor(c),
+        'fill-extrusion-vertical-gradient': false
+      }
     };
-    map.addLayer(Object.assign({ id:'as-' + c }, base));
-    map.addLayer(Object.assign({ id:'as-' + c + '-cap', layout:{ visibility:'none' } }, base,
-      { paint: Object.assign({}, base.paint,
-        { 'fill-extrusion-base':['get','cbase'], 'fill-extrusion-height':['get','ctop'] }) }));
-    map.addLayer(Object.assign({ id:'as-' + c + '-hl', layout:{ visibility:'none' } }, base,
-      { paint: Object.assign({}, base.paint, { 'fill-extrusion-opacity': 0.95 }) }));
+    const layer = (id, baseKey, topKey, op, extra) => map.addLayer({
+      id, ...common,
+      layout: extra?.layout || {},
+      paint: Object.assign({}, common.paint, {
+        'fill-extrusion-base':   ['get', baseKey],
+        'fill-extrusion-height': ['get', topKey],
+        'fill-extrusion-opacity': op
+      })
+    });
+
+    // footprint on the ground: says WHERE the thing is, whatever the 3D is doing
+    map.addLayer({
+      id: 'as-' + c + '-foot', type: 'line', source: 'airspace',
+      filter: ['==', ['get', 'cls'], c],
+      layout: { 'line-join': 'round' },
+      paint: { 'line-color': rampFor(c), 'line-width': 1.1, 'line-opacity': 0.55 }
+    });
+
+    layer('as-' + c,           'base',  'top',  bodyOp(c));   // the glass
+    layer('as-' + c + '-ceil', 'cbase', 'ctop', rimOp(c) * 0.7);
+    layer('as-' + c + '-floor','fbase', 'ftop', rimOp(c));    // the bright edge
+    layer('as-' + c + '-hl',   'base',  'top',  0.92, { layout: { visibility: 'none' } });
   });
-  map.addLayer({ id:'alt-plane', type:'fill-extrusion', source:'plane',
-    paint:{ 'fill-extrusion-color':'#ffd24a',
-            'fill-extrusion-base':['get','base'],
-            'fill-extrusion-height':['get','top'],
-            'fill-extrusion-opacity':0.3 } });
+
+  map.addLayer({
+    id: 'alt-plane', type: 'fill-extrusion', source: 'plane',
+    paint: {
+      'fill-extrusion-color': '#ffd24a',
+      'fill-extrusion-base': ['get', 'base'],
+      'fill-extrusion-height': ['get', 'top'],
+      'fill-extrusion-opacity': 0.3
+    }
+  });
 }
 
 /* ================= boot ================= */
 map.on('load', async () => {
   addLayers();
   makeAirports();
-  syncCam();
+  initGizmo();
+  retuneExag(true);
   try {
     const r = await fetch('data/index.json', { cache: 'no-cache' });
     if (r.ok) {
@@ -802,6 +900,23 @@ map.on('moveend', () => {
 });
 map.on('rotate', syncCam);
 map.on('pitch', syncCam);
+function retuneExag(force) {
+  const want = exagAuto();
+  if (!force && Math.abs(want - state.exag) < 0.2) return;
+  state.exag = want;
+  if (state.feats.size) { map.getSource('airspace').setData(buildFC()); updatePlane(); }
+  const s = document.getElementById('status');
+  if (s && s.classList.contains('good'))
+    s.innerHTML = s.innerHTML.replace(/×[\d.]+$/, '×' + state.exag.toFixed(1));
+}
+map.on('zoom', () => retuneExag(false));
+map.on('resize', () => retuneExag(true));
+
+let labelTick;
+map.on('move', () => {
+  if (!state.labelsOn || labelTick) return;
+  labelTick = requestAnimationFrame(() => { labelTick = null; updateLabels(); });
+});
 
 /* ================= interaction ================= */
 const popup = new maplibregl.Popup({ closeButton: true, maxWidth: '290px' });
@@ -817,7 +932,7 @@ map.on('click', e => {
     .slice(0, 7)
     .map(h => {
       const p = h.properties;
-      return '<div class="row"><span class="sw" style="background:' + CLASSES[p.cls].color + '"></span>' +
+      return '<div class="row"><span class="sw" style="background:' + swatch(p.cls, p.low) + '"></span>' +
         '<div><div class="nm">' + p.name + '</div>' +
         '<div class="alt"><b>' + p.highLabel + '</b> down to <b>' + p.lowLabel + '</b></div>' +
         (p.hours ? '<div class="hrs">' + p.hours + '</div>' : '') + '</div></div>';
@@ -825,39 +940,22 @@ map.on('click', e => {
   popup.setLngLat(e.lngLat).setHTML('<div class="pop">' + rows + '</div>').addTo(map);
 });
 
-/* ---- easy orbit: drag anywhere to tilt + rotate ---- */
-const canvas = map.getCanvas();
-const mapEl = document.getElementById('map');
-let orbit = null;
+/* ---- direct-manipulation camera: compass ring + tilt bar ---- */
 const clampP = v => Math.max(0, Math.min(85, v));
+const norm = b => { while (b > 180) b -= 360; while (b < -180) b += 360; return b; };
 
-function orbitStart(x, y) { orbit = { x, y, b: map.getBearing(), p: map.getPitch() }; mapEl.classList.add('dragging'); }
-function orbitMove(x, y) {
-  if (!orbit) return;
-  map.jumpTo({ bearing: orbit.b - (x - orbit.x) * 0.32, pitch: clampP(orbit.p + (y - orbit.y) * 0.24) });
-}
-function orbitEnd() { orbit = null; mapEl.classList.remove('dragging'); }
+// Double-click flies toward the point you clicked, like Google Earth.
+map.doubleClickZoom.disable();
+map.on('dblclick', e => {
+  const out = e.originalEvent.shiftKey;
+  map.easeTo({
+    center: out ? map.getCenter() : e.lngLat,
+    zoom: map.getZoom() + (out ? -1.2 : 1.2),
+    duration: 700
+  });
+});
 
-canvas.addEventListener('mousedown', e => {
-  if (!state.orbitDrag || e.button !== 0) return;
-  e.preventDefault(); e.stopPropagation();
-  orbitStart(e.clientX, e.clientY);
-}, true);
-window.addEventListener('mousemove', e => orbitMove(e.clientX, e.clientY));
-window.addEventListener('mouseup', orbitEnd);
-canvas.addEventListener('touchstart', e => {
-  if (!state.orbitDrag || e.touches.length !== 1) return;
-  e.preventDefault(); e.stopPropagation();
-  orbitStart(e.touches[0].clientX, e.touches[0].clientY);
-}, { capture: true, passive: false });
-canvas.addEventListener('touchmove', e => {
-  if (!orbit || e.touches.length !== 1) return;
-  e.preventDefault();
-  orbitMove(e.touches[0].clientX, e.touches[0].clientY);
-}, { capture: true, passive: false });
-canvas.addEventListener('touchend', orbitEnd, true);
-
-/* shift+scroll spins, alt+scroll tilts */
+// shift+scroll spins, alt+scroll tilts
 map.getContainer().addEventListener('wheel', e => {
   if (!e.shiftKey && !e.altKey) return;
   e.preventDefault(); e.stopPropagation();
@@ -865,37 +963,65 @@ map.getContainer().addEventListener('wheel', e => {
   else map.setPitch(clampP(map.getPitch() - e.deltaY * 0.14));
 }, { capture: true, passive: false });
 
+function initGizmo() {
+  const comp = document.getElementById('compass');
+  const rose = document.getElementById('rose');
+  const tilt = document.getElementById('tilt');
+  const fill = document.getElementById('tiltFill');
+  const knob = document.getElementById('tiltKnob');
+  const TRACK = 104 - 14;
+
+  // The compass is absolute, not relative: grab it anywhere and the bearing
+  // follows your finger, exactly like turning a physical dial.
+  let grabOffset = 0;
+  const angleAt = e => {
+    const r = comp.getBoundingClientRect();
+    return Math.atan2(e.clientX - (r.left + r.width / 2),
+                      (r.top + r.height / 2) - e.clientY) * 180 / Math.PI;
+  };
+  comp.addEventListener('pointerdown', e => {
+    comp.setPointerCapture(e.pointerId);
+    comp.classList.add('drag');
+    grabOffset = norm(angleAt(e) + map.getBearing());
+    e.preventDefault();
+  });
+  comp.addEventListener('pointermove', e => {
+    if (!comp.hasPointerCapture(e.pointerId)) return;
+    map.setBearing(norm(grabOffset - angleAt(e)));
+  });
+  const release = e => { comp.classList.remove('drag'); if (comp.hasPointerCapture(e.pointerId)) comp.releasePointerCapture(e.pointerId); };
+  comp.addEventListener('pointerup', release);
+  comp.addEventListener('pointercancel', release);
+  comp.addEventListener('dblclick', () => map.easeTo({ bearing: 0, duration: 500 }));
+
+  const setTiltFrom = e => {
+    const r = tilt.getBoundingClientRect();
+    const t = 1 - Math.max(0, Math.min(1, (e.clientY - r.top - 7) / TRACK));
+    map.setPitch(clampP(t * 85));
+  };
+  tilt.addEventListener('pointerdown', e => {
+    tilt.setPointerCapture(e.pointerId); setTiltFrom(e); e.preventDefault();
+  });
+  tilt.addEventListener('pointermove', e => {
+    if (tilt.hasPointerCapture(e.pointerId)) setTiltFrom(e);
+  });
+  tilt.addEventListener('dblclick', () => map.easeTo({ pitch: 0, duration: 500 }));
+
+  window.__syncGizmo = () => {
+    rose.setAttribute('transform', `rotate(${-map.getBearing()} 50 50)`);
+    const t = clampP(map.getPitch()) / 85;
+    knob.style.bottom = (4 + t * TRACK) + 'px';
+    fill.style.height = (7 + t * TRACK) + 'px';
+  };
+  window.__syncGizmo();
+}
+
 /* ================= controls ================= */
 const $ = id => document.getElementById(id);
 const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
 
-let syncing = false;
-function syncCam() {
-  syncing = true;
-  const p = Math.round(map.getPitch());
-  let b = Math.round(map.getBearing()); while (b > 180) b -= 360; while (b < -180) b += 360;
-  $('pitch').value = p; $('pitchV').textContent = p + '°';
-  $('bear').value = b;  $('bearV').textContent = (b === 0 ? 'North up' : (b > 0 ? b + '° E' : (-b) + '° W'));
-  syncing = false;
-}
+function syncCam() { if (window.__syncGizmo) window.__syncGizmo(); }
 
-on('pitch', 'input', e => { if (!syncing) map.setPitch(+e.target.value); });
-on('bear',  'input', e => { if (!syncing) map.setBearing(+e.target.value); });
-on('rotL', 'click', () => map.easeTo({ bearing: map.getBearing() - 30, duration: 350 }));
-on('rotR', 'click', () => map.easeTo({ bearing: map.getBearing() + 30, duration: 350 }));
-on('north','click', () => map.easeTo({ bearing: 0, duration: 500 }));
-
-on('dragMode', 'click', () => {
-  state.orbitDrag = !state.orbitDrag;
-  const b = $('dragMode');
-  b.classList.toggle('on', state.orbitDrag);
-  b.textContent = state.orbitDrag ? '🔄 Drag to tilt & rotate' : '✋ Drag to pan';
-  mapEl.classList.toggle('orbit', state.orbitDrag);
-  if (state.orbitDrag) map.dragPan.disable(); else map.dragPan.enable();
-});
-
-on('exag', 'input', e => { state.exag = +e.target.value; $('exagV').textContent = state.exag + '×'; refresh(); });
-on('op',   'input', e => { state.opacity = +e.target.value / 100; $('opV').textContent = e.target.value + '%'; refresh(); });
 on('alt',  'input', e => { state.alt = +e.target.value; $('altV').textContent = state.alt.toLocaleString() + ' ft'; refresh(); });
 
 document.querySelectorAll('[data-cls]').forEach(cb => cb.addEventListener('change', e => {
@@ -903,19 +1029,8 @@ document.querySelectorAll('[data-cls]').forEach(cb => cb.addEventListener('chang
   if (e.target.dataset.cls === 'E' && e.target.checked) loadView(false);
   refresh();
 }));
-on('plane',  'change', e => { state.planeOn = e.target.checked; refresh(); });
-on('slice',  'change', e => { state.sliceOn = e.target.checked; refresh(); });
-on('labels', 'change', e => { state.labelsOn = e.target.checked; refresh(); });
-on('apts',   'change', e => { state.airportsOn = e.target.checked; makeAirports(); });
-on('hollow', 'change', e => { state.hollow = e.target.checked; refresh(); });
 on('clip',   'change', e => { state.clipOn = e.target.checked; refresh(); });
-on('evenOp', 'change', e => { state.evenOp = e.target.checked; refresh(); });
 
-document.querySelectorAll('[data-frame]').forEach(b => b.addEventListener('click', e => {
-  document.querySelectorAll('[data-frame]').forEach(x => x.classList.remove('on'));
-  e.target.classList.add('on');
-  map.easeTo(Object.assign({ duration: 900 }, FRAMES[e.target.dataset.frame]));
-}));
 
 document.querySelectorAll('[data-base]').forEach(b => b.addEventListener('click', e => {
   document.querySelectorAll('[data-base]').forEach(x => x.classList.remove('on'));
@@ -966,7 +1081,6 @@ on('q', 'keydown', e => {
   const res = search(e.target.value);
   if (res.length) flyToAirport(res[0]);
 });
-on('home', 'click', () => map.flyTo(Object.assign({ duration: 1600 }, HOME)));
 </script>
 </body>
 </html>
