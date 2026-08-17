@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[-120.4667,41.7833],[-120.9833,41.4167],[-121.3761,41.8508],[-121.1981,42.225],[-120.625,42.3061],[-120.4667,41.7833]]]},"properties":{"cls":"SUA","low":3000,"high":18000,"agl":1,"open":0,"name":"GOOSE NORTH MOA · MOA","hours":"0700 - 1900, MON - FRI; OTHER TIMES BY NOTAM"}}]}
