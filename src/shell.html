@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Upside Down Wedding Cakes — US airspace in 3D</title>
+<style>/*__MLCSS__*/</style>
+<style>
+:root{
+  --bg:#0d1117; --panel:rgba(17,22,30,.92); --line:rgba(255,255,255,.10);
+  --txt:#e8edf4; --dim:#93a1b5; --acc:#5aa9e6;
+  --B:#3987e5; --C:#d55181; --D:#c98500; --E:#8e8d85; --SUA:#e34948;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+  font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased}
+#map{position:absolute;inset:0}
+
+/* ---- panel ---- */
+#panel{position:absolute;top:12px;left:12px;width:288px;max-height:calc(100% - 24px);
+  overflow-y:auto;background:var(--panel);backdrop-filter:blur(14px);
+  border:1px solid var(--line);border-radius:14px;padding:14px 14px 12px;
+  box-shadow:0 10px 40px rgba(0,0,0,.55);z-index:5}
+#panel.collapsed>*:not(.hd){display:none}
+#panel.collapsed{width:auto}
+.hd{display:flex;align-items:center;gap:8px;margin:-2px 0 10px;cursor:pointer;user-select:none}
+.hd h1{font-size:13.5px;line-height:1.25;margin:0;font-weight:650;letter-spacing:.1px;flex:1}
+.hd .chev{color:var(--dim);font-size:11px}
+.sub{font-size:11px;color:var(--dim);margin:-6px 0 10px;font-style:italic}
+#panel.collapsed .sub{display:none}
+h2{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--dim);
+  margin:16px 0 7px;font-weight:650}
+h2:first-of-type{margin-top:6px}
+
+/* ---- status ---- */
+#status{font-size:11.5px;color:var(--dim);line-height:1.4;padding:7px 9px;border-radius:8px;
+  background:rgba(255,255,255,.04);border:1px solid var(--line)}
+#status.good{color:#9fd8a8}
+#status.warn{color:#ffd88a;background:rgba(255,210,74,.08);border-color:rgba(255,210,74,.3)}
+.mini{margin-top:6px;background:rgba(255,255,255,.10);border:1px solid var(--line);color:var(--txt);
+  font:inherit;font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer}
+.mini:hover{background:rgba(255,255,255,.18)}
+#status.bad{color:#ffb3a7;background:rgba(224,97,79,.10);border-color:rgba(224,97,79,.35)}
+.ok{display:inline-block;width:6px;height:6px;border-radius:50%;background:#5ec26a;margin-right:6px;vertical-align:1px}
+
+/* ---- rows ---- */
+label.chk{display:flex;align-items:center;gap:9px;padding:4px 0;cursor:pointer;font-size:13px}
+label.chk input{appearance:none;width:15px;height:15px;border-radius:4px;border:1.5px solid rgba(255,255,255,.28);
+  background:transparent;cursor:pointer;position:relative;flex:none;transition:.12s}
+label.chk input:checked{background:var(--acc);border-color:var(--acc)}
+label.chk input:checked::after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;
+  border:solid #0d1117;border-width:0 2px 2px 0;transform:rotate(42deg)}
+.sw{width:11px;height:11px;border-radius:3px;flex:none;box-shadow:0 0 0 1px rgba(255,255,255,.25) inset}
+.cnt{margin-left:auto;font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+
+/* ---- sliders ---- */
+.sl{margin:9px 0 4px}
+.sl .lb{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px}
+.sl .lb span:last-child{color:var(--acc);font-variant-numeric:tabular-nums;font-weight:600}
+input[type=range]{width:100%;appearance:none;height:3px;border-radius:2px;
+  background:rgba(255,255,255,.16);outline:none}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:15px;height:15px;border-radius:50%;
+  background:var(--acc);cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,.5)}
+input[type=range]::-moz-range-thumb{width:15px;height:15px;border:0;border-radius:50%;background:var(--acc);cursor:pointer}
+
+/* ---- buttons ---- */
+.btns{display:flex;flex-wrap:wrap;gap:5px}
+.btns button{flex:1 1 auto;background:rgba(255,255,255,.06);border:1px solid var(--line);
+  color:var(--txt);font-size:11.5px;padding:6px 8px;border-radius:7px;cursor:pointer;
+  white-space:nowrap;transition:.12s;font-family:inherit}
+.btns button:hover{background:rgba(255,255,255,.12)}
+.btns button.on{background:var(--acc);border-color:var(--acc);color:#08111c;font-weight:640}
+
+button.wide{width:100%;margin-top:6px;background:rgba(255,255,255,.06);border:1px solid var(--line);
+  color:var(--txt);font-size:12px;padding:9px 8px;border-radius:8px;cursor:pointer;
+  font-family:inherit;font-weight:600;transition:.12s}
+button.wide:hover{background:rgba(255,255,255,.12)}
+button.wide.on{background:#ffd24a;border-color:#ffd24a;color:#1a1405}
+#q{width:100%;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:8px;
+  color:var(--txt);font:inherit;font-size:12.5px;padding:8px 10px;outline:none}
+#q:focus{border-color:var(--acc)}
+#q::placeholder{color:#61708a}
+#results{margin-top:4px}
+.res{display:flex;gap:8px;align-items:baseline;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px}
+.res:hover{background:rgba(255,255,255,.10)}
+.res b{color:var(--acc);font-variant-numeric:tabular-nums;min-width:34px}
+.res span{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ramp{display:flex;align-items:center;gap:7px;margin:9px 0 2px;font-size:10px;color:var(--dim)}
+.ramp i{flex:1;height:7px;border-radius:4px;
+  background:linear-gradient(90deg,#9ecbf5,#4f93d8,#14528f)}
+.tip{font-size:10.5px;color:#6f7f94;margin-top:6px;line-height:1.4}
+#inside{font-size:11.5px;color:var(--dim);margin-top:8px;min-height:16px}
+#inside b{color:var(--txt)}
+.note{font-size:10.5px;color:#6f7f94;line-height:1.45;margin-top:14px;
+  border-top:1px solid var(--line);padding-top:10px}
+.note a{color:#7fb4e0}
+
+/* ---- markers ---- */
+.apt{display:flex;align-items:center;gap:4px;pointer-events:none;transform:translateY(-1px)}
+.apt .dot{width:5px;height:5px;border-radius:50%;background:#fff;
+  box-shadow:0 0 0 1.5px rgba(0,0,0,.75),0 0 7px rgba(255,255,255,.5)}
+.apt .tag{font-size:9.5px;font-weight:700;letter-spacing:.04em;color:#fff;
+  text-shadow:0 0 3px #000,0 0 6px #000,0 1px 2px #000;opacity:.85}
+.apt.big .dot{width:7px;height:7px;background:#ffd24a;box-shadow:0 0 0 1.5px rgba(0,0,0,.8),0 0 9px rgba(255,210,74,.7)}
+.apt.big .tag{font-size:11px;opacity:1}
+.apt.home .dot{background:#5ec26a;width:9px;height:9px;box-shadow:0 0 0 2px #0d1117,0 0 12px rgba(94,194,106,.9)}
+.apt.home .tag{color:#8ff0a0;font-size:12px}
+.shelf{font-size:10px;font-weight:700;padding:1px 4px;border-radius:4px;pointer-events:none;
+  background:rgba(8,14,22,.78);border:1px solid rgba(255,255,255,.14);white-space:nowrap}
+.shelf.cB{color:var(--B)} .shelf.cC{color:var(--C)} .shelf.cD{color:var(--D)}
+.shelf.cE{color:var(--E)} .shelf.cSUA{color:var(--SUA)}
+
+/* ---- popup ---- */
+.maplibregl-popup-content{background:var(--panel)!important;backdrop-filter:blur(14px);
+  color:var(--txt);border:1px solid var(--line);border-radius:11px;padding:10px 11px;
+  box-shadow:0 8px 30px rgba(0,0,0,.6)}
+.maplibregl-popup-tip{display:none}
+.maplibregl-popup-close-button{color:var(--dim);font-size:17px;right:3px;top:1px}
+.pop .row{display:flex;gap:8px;padding:5px 0;border-top:1px solid var(--line)}
+.pop .row:first-child{border-top:0;padding-top:0}
+.pop .sw{margin-top:4px}
+.pop .nm{font-size:12px;font-weight:640;line-height:1.3}
+.pop .alt{font-size:11.5px;color:var(--dim)}
+.pop .alt b{color:var(--txt);font-variant-numeric:tabular-nums}
+.pop .hrs{font-size:10px;color:#6f7f94;margin-top:1px}
+
+.maplibregl-ctrl-attrib{font-size:10px}
+/* bigger, less fiddly zoom/compass buttons */
+.maplibregl-ctrl-group{border-radius:11px!important;background:var(--panel)!important;
+  border:1px solid var(--line);backdrop-filter:blur(12px)}
+.maplibregl-ctrl-group button{width:40px!important;height:40px!important;background:transparent!important}
+.maplibregl-ctrl-group button+button{border-top:1px solid var(--line)!important}
+.maplibregl-ctrl-group button:hover{background:rgba(255,255,255,.10)!important}
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon{filter:invert(1) brightness(1.6);transform:scale(1.15)}
+#map.orbit .maplibregl-canvas{cursor:grab}
+#map.orbit.dragging .maplibregl-canvas{cursor:grabbing}
+#nav{position:absolute;right:18px;bottom:52px;z-index:6;display:flex;align-items:flex-end;gap:10px;
+  touch-action:none;user-select:none}
+#compass{width:104px;height:104px;cursor:grab;filter:drop-shadow(0 6px 18px rgba(0,0,0,.6))}
+#compass.drag{cursor:grabbing}
+#compass svg{width:100%;height:100%;display:block}
+#compass .ring{fill:rgba(17,22,30,.82);stroke:rgba(255,255,255,.18);stroke-width:2}
+#compass:hover .ring{stroke:rgba(255,255,255,.34)}
+#compass .nd{fill:#e0614f}
+#compass .nl{fill:#e8edf4;font:700 15px -apple-system,sans-serif;text-anchor:middle}
+#compass .tick{stroke:rgba(255,255,255,.30);stroke-width:2.5;stroke-linecap:round}
+#compass .hub{fill:rgba(255,255,255,.10);stroke:rgba(255,255,255,.22);stroke-width:1.5}
+#tilt{position:relative;width:26px;height:104px;border-radius:13px;cursor:ns-resize;
+  background:rgba(17,22,30,.82);border:1px solid rgba(255,255,255,.18);overflow:hidden;
+  box-shadow:0 6px 18px rgba(0,0,0,.6)}
+#tiltFill{position:absolute;left:0;right:0;bottom:0;background:rgba(90,169,230,.30)}
+#tiltKnob{position:absolute;left:3px;right:3px;height:6px;border-radius:3px;background:var(--acc);
+  box-shadow:0 1px 4px rgba(0,0,0,.6)}
+#tilt .tl{position:absolute;bottom:5px;left:0;right:0;text-align:center;font-size:8px;
+  letter-spacing:.06em;color:var(--dim);pointer-events:none}
+@media (max-width:640px){ #nav{right:10px;bottom:78px;transform:scale(.86);transform-origin:bottom right} }
+#hint{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:4;
+  background:rgba(17,22,30,.86);border:1px solid var(--line);border-radius:20px;
+  padding:6px 14px;font-size:11.5px;color:var(--dim);pointer-events:none;
+  animation:fade 1s ease 7s forwards;backdrop-filter:blur(10px)}
+@keyframes fade{to{opacity:0}}
+@media (max-width:640px){
+  #panel{width:calc(100% - 24px);max-height:52%}
+}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="panel">
+  <div class="hd" id="panelToggle">
+    <h1>Upside Down Wedding Cakes</h1><span class="chev">▾</span>
+  </div>
+
+  <div class="sub">All of US airspace, in 3D</div>
+  <div id="status">Starting…</div>
+
+  <h2>Airspace</h2>
+  <label class="chk"><input type="checkbox" data-cls="B" checked><span class="sw" style="background:var(--B)"></span>Class B <span class="cnt" id="nB">–</span></label>
+  <label class="chk"><input type="checkbox" data-cls="C" checked><span class="sw" style="background:var(--C)"></span>Class C <span class="cnt" id="nC">–</span></label>
+  <label class="chk"><input type="checkbox" data-cls="D" checked><span class="sw" style="background:var(--D)"></span>Class D <span class="cnt" id="nD">–</span></label>
+  <label class="chk"><input type="checkbox" data-cls="SUA" checked><span class="sw" style="background:var(--SUA)"></span>Restricted · MOA <span class="cnt" id="nSUA">–</span></label>
+  <label class="chk"><input type="checkbox" data-cls="E"><span class="sw" style="background:var(--E)"></span>Class E surface <span class="cnt" id="nE">–</span></label>
+  <div class="ramp"><span>floor SFC</span><i></i><span>10,000</span></div>
+  <div class="sl"><div class="lb"><span>Fill</span><span id="fillV">100%</span></div>
+    <input type="range" id="fill" min="15" max="100" step="1" value="100"></div>
+
+  <h2>Cut away</h2>
+  <div class="sl"><div class="lb"><span>Hide everything above</span><span id="altV">3,500 ft</span></div>
+    <input type="range" id="alt" min="500" max="12000" step="100" value="3500"></div>
+  <label class="chk"><input type="checkbox" id="clip">Slice the sky here</label>
+  <div id="inside"></div>
+
+  <h2>Go to</h2>
+  <input id="q" type="search" placeholder="Airport code or name — SFO, ASE…" autocomplete="off" spellcheck="false">
+  <div id="results"></div>
+
+  <h2>Basemap</h2>
+  <div class="btns">
+    <button data-base="sectional" class="on">Sectional</button>
+    <button data-base="tac">TAC</button>
+    <button data-base="sat">Satellite</button>
+    <button data-base="none">Off</button>
+  </div>
+
+  <div class="note">
+    Each volume runs from its <b>floor to its ceiling in feet MSL</b>, with bright
+    plates marking both. Within a class, pale means a low floor and dark a high one.
+    Labels read ceiling/floor in hundreds, so <b>100/15</b> is 10,000 down to 1,500.
+    Heights are exaggerated 6× — read the numbers, not the apparent size — and the
+    ground is flat at sea level, so terrain is not modelled.<br><br>
+    Drag the compass to spin, the bar beside it to tilt. Double-click to fly in.<br><br>
+    <b>Not for navigation.</b> Verify against current charts and NOTAMs.<br><br>
+    Airspace and charts: <a href="https://adds-faa.opendata.arcgis.com/" target="_blank"
+    rel="noopener">FAA Aeronautical Information Services</a>. Airports:
+    <a href="https://ourairports.com/" target="_blank" rel="noopener">OurAirports</a>.
+    Built with <a href="https://maplibre.org/" target="_blank" rel="noopener">MapLibre GL</a>.
+    <a href="https://github.com/bfirsh/upside-down-wedding-cakes" target="_blank"
+    rel="noopener">Source on GitHub</a>.
+  </div>
+</div>
+
+<div id="nav">
+  <div id="tilt" title="Drag to tilt">
+    <div id="tiltFill"></div><div id="tiltKnob"></div><span class="tl">tilt</span>
+  </div>
+  <div id="compass" title="Drag to rotate · double-click for north up">
+    <svg viewBox="0 0 100 100">
+      <circle class="ring" cx="50" cy="50" r="44"/>
+      <g id="rose">
+        <path class="nd" d="M50 8 L57 26 L50 22 L43 26 Z"/>
+        <text class="nl" x="50" y="40">N</text>
+        <line class="tick" x1="50" y1="88" x2="50" y2="80"/>
+        <line class="tick" x1="12" y1="50" x2="20" y2="50"/>
+        <line class="tick" x1="88" y1="50" x2="80" y2="50"/>
+      </g>
+      <circle class="hub" cx="50" cy="50" r="13"/>
+    </svg>
+  </div>
+</div>
+
+<div id="hint">Right-drag to tilt &amp; rotate &mdash; or switch the big button to <b>Drag to tilt &amp; rotate</b></div>
+
+<script>/*__MLJS__*/</script>
+<script>const AIRPORTS=/*__APTS__*/;</script>
+<script>/*__APP__*/</script>
+</body>
+</html>
