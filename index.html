@@ -340,16 +340,12 @@ function mix(a, b, t) {
 
 // later is drawn on top, so the small low stuff wins
 const DRAW = ['B', 'C', 'SUA', 'E', 'D'];
-// Keep the airspace stack a roughly constant fraction of how wide the view is.
-// Zoomed out over a whole region 10,000 ft is a rounding error and needs stretching;
-// zoomed in on one field the camera sits low and a stretched Bravo swallows it, so
-// the factor has to come DOWN. Both ends are wrong with any fixed number.
-function exagAuto() {
-  const px = map.getCanvas().clientWidth || 1200;
-  const mpp = 156543.03 * Math.cos(map.getCenter().lat * Math.PI / 180) / Math.pow(2, map.getZoom());
-  const viewM = mpp * px;
-  return Math.max(1.2, Math.min(14, 0.055 * viewM / 3048));
-}
+// ONE fixed vertical scale, deliberately. An earlier version derived this from the
+// view width so every frame was individually optimal — and it was wrong: zooming
+// changed the shape of the thing you were trying to learn. Constancy of the object
+// beats per-frame prettiness. 6x reads sensibly from a single Class D up to a
+// whole sectional, so it is simply constant.
+const EXAG = 6;
 
 const opacityFor = c => Math.min(0.97, state.opacity * (state.evenOp ? 1 : CLASSES[c].w));
 
@@ -362,7 +358,7 @@ const FRAMES = {
 };
 
 const state = {
-  exag: 5, opacity: 0.20, alt: 3500,
+  exag: EXAG, opacity: 0.50, alt: 3500,
   planeOn: false, sliceOn: false, labelsOn: true, airportsOn: true,
   orbitDrag: false, shape: 'solid', footOn: true, evenOp: false, clipOn: false,
   snapshot: null,            // data/index.json when a baked dataset is present
@@ -581,7 +577,7 @@ async function loadTiles() {
   const when = new Date(snap.generated).toLocaleDateString(undefined,
     { year: 'numeric', month: 'short', day: 'numeric' });
   status('<span class="ok"></span>' + state.feats.size + ' volumes · FAA ' + when +
-         ' · heights ×' + state.exag.toFixed(1), 'good');
+         ' · heights ×' + EXAG, 'good');
   counts();
   refresh();
   return true;
@@ -663,19 +659,83 @@ async function loadView(force) {
 }
 
 /* ================= rendering ================= */
+
+/* ---- edge bands ------------------------------------------------------------
+   A "floor plate" spanning the whole polygon is a solid sheet lying directly on
+   top of whatever is underneath — measured, a Bravo's floor plate let only 21% of
+   the light through to the Class D below it. So the rims are rings, not plates:
+   the polygon with an inward-offset copy punched out as a hole. You still get a
+   crisp bright edge at the floor and ceiling, but the middle is open sky.        */
+function offsetRing(ring, d, lat) {
+  const kx = 1 / Math.max(0.2, Math.cos(lat * Math.PI / 180));
+  const n = ring.length - 1;                       // ring is closed
+  if (n < 3) return null;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const p = ring[i], a = ring[(i - 1 + n) % n], b = ring[(i + 1) % n];
+    const e1x = (p[0] - a[0]) / kx, e1y = p[1] - a[1];
+    const e2x = (b[0] - p[0]) / kx, e2y = b[1] - p[1];
+    const l1 = Math.hypot(e1x, e1y) || 1, l2 = Math.hypot(e2x, e2y) || 1;
+    // right-hand normals of the two edges, averaged into the corner bisector
+    let bx = (e1y / l1) + (e2y / l2), by = -(e1x / l1) - (e2x / l2);
+    const bl = Math.hypot(bx, by);
+    if (bl < 1e-9) { bx = e1y / l1; by = -e1x / l1; } else { bx /= bl; by /= bl; }
+    out.push([p[0] + bx * d * kx, p[1] + by * d]);
+  }
+  out.push(out[0].slice());
+  return out;
+}
+
+const ringArea = r => {
+  let s = 0;
+  for (let i = 0, n = r.length - 1; i < n; i++) s += r[i][0] * r[i + 1][1] - r[i + 1][0] * r[i][1];
+  return Math.abs(s) / 2;
+};
+
+// Offset inward whichever way shrinks the ring, and bail out if the result folds
+// in on itself — a thin or spiky polygon just keeps its solid plate, which costs
+// nothing because it was never big enough to hide anything.
+function bandFor(poly, lat) {
+  const build = (rings) => {
+    const outer = rings[0];
+    const A = ringArea(outer);
+    if (A < 1e-6) return null;
+    const d = Math.min(0.010, Math.max(0.0016, Math.sqrt(A) * 0.10));
+    let best = null;
+    for (const s of [d, -d]) {
+      const inner = offsetRing(outer, s, lat);
+      if (!inner) continue;
+      const ia = ringArea(inner);
+      if (ia < A * 0.97 && ia > A * 0.12) { best = inner; break; }
+    }
+    return best ? [outer, best] : null;
+  };
+  if (poly.type === 'Polygon') {
+    const r = build(poly.coordinates);
+    return r ? { type: 'Polygon', coordinates: r } : null;
+  }
+  const polys = [];
+  for (const pc of poly.coordinates) {
+    const r = build(pc);
+    if (r) polys.push(r);
+  }
+  return polys.length ? { type: 'MultiPolygon', coordinates: polys } : null;
+}
+
 function buildFC() {
   const feats = [];
   const clip = state.clipOn ? state.alt : Infinity;
   state.feats.forEach(f => {
     if (!CLASSES[f.properties.cls].on) return;
-    if (f.properties.low >= clip) return;               // starts above the cut — hide it
-    feats.push({ type:'Feature', geometry:f.geometry,
-      properties: Object.assign({}, f.properties, (() => {
-        const lo = f.properties.low * FT * state.exag;
-        const hi = Math.min(f.properties.high, clip) * FT * state.exag;
-        const slab = Math.max(12 * state.exag, Math.min(26 * state.exag, (hi - lo) * 0.10));
-        return { base: lo, top: hi, fbase: lo, ftop: lo + slab, cbase: hi - slab, ctop: hi };
-      })()) });
+    if (f.properties.low >= clip) return;
+    const lo = f.properties.low * FT * state.exag;
+    const hi = Math.min(f.properties.high, clip) * FT * state.exag;
+    const slab = Math.max(12 * state.exag, Math.min(26 * state.exag, (hi - lo) * 0.10));
+    const props = Object.assign({}, f.properties, {
+      base: lo, top: hi, fbase: lo, ftop: lo + slab, cbase: hi - slab, ctop: hi
+    });
+    feats.push({ type: 'Feature', geometry: f.geometry, properties: Object.assign({ rim: 0 }, props) });
+
   });
   return { type: 'FeatureCollection', features: feats };
 }
@@ -693,15 +753,13 @@ function refresh() {
       map.setLayoutProperty(id, 'visibility', vis(v));
       if (op != null) map.setPaintProperty(id, 'fill-extrusion-opacity', op);
     };
-    set('as-' + c,            S === 'solid',  bodyOp(c));
-    set('as-' + c + '-ceil',  S !== 'floors', rimOp(c) * (S === 'solid' ? 0.7 : 1));
-    set('as-' + c + '-floor', true,           rimOp(c));
+    set('as-' + c, true, bodyOp(c));
     if (map.getLayer('as-' + c + '-foot'))
       map.setLayoutProperty('as-' + c + '-foot', 'visibility', vis(state.footOn));
     if (map.getLayer('as-' + c + '-hl')) {
       map.setLayoutProperty('as-' + c + '-hl', 'visibility', vis(state.sliceOn));
       map.setFilter('as-' + c + '-hl', ['all',
-        ['==', ['get', 'cls'], c],
+        ['==', ['get', 'cls'], c], ['==', ['get', 'rim'], 0],
         ['<=', ['get', 'low'], state.alt],
         ['>',  ['get', 'high'], state.alt]]);
     }
@@ -830,20 +888,20 @@ function updateLabels() {
    and its outline on the ground — and the eye reassembles the box from the rims.  */
 
 const bodyOp = c => Math.min(0.55, state.opacity * (state.evenOp ? 1 : CLASSES[c].w));
-const rimOp  = c => Math.min(0.95, 0.42 + bodyOp(c) * 2.2);
+const rimOp  = c => 0.92;   // safe to be solid: a band hides almost nothing
 
 function addLayers() {
   DRAW.forEach(c => {
     const common = {
       type: 'fill-extrusion', source: 'airspace',
-      filter: ['==', ['get', 'cls'], c],
       paint: {
         'fill-extrusion-color': rampFor(c),
         'fill-extrusion-vertical-gradient': false
       }
     };
-    const layer = (id, baseKey, topKey, op, extra) => map.addLayer({
+    const layer = (id, baseKey, topKey, op, rim, extra) => map.addLayer({
       id, ...common,
+      filter: ['all', ['==', ['get', 'cls'], c], ['==', ['get', 'rim'], rim]],
       layout: extra?.layout || {},
       paint: Object.assign({}, common.paint, {
         'fill-extrusion-base':   ['get', baseKey],
@@ -855,15 +913,13 @@ function addLayers() {
     // footprint on the ground: says WHERE the thing is, whatever the 3D is doing
     map.addLayer({
       id: 'as-' + c + '-foot', type: 'line', source: 'airspace',
-      filter: ['==', ['get', 'cls'], c],
+      filter: ['all', ['==', ['get', 'cls'], c], ['==', ['get', 'rim'], 0]],
       layout: { 'line-join': 'round' },
-      paint: { 'line-color': rampFor(c), 'line-width': 1.1, 'line-opacity': 0.55 }
+      paint: { 'line-color': rampFor(c), 'line-width': 1.6, 'line-opacity': 0.9 }
     });
 
-    layer('as-' + c,           'base',  'top',  bodyOp(c));   // the glass
-    layer('as-' + c + '-ceil', 'cbase', 'ctop', rimOp(c) * 0.7);
-    layer('as-' + c + '-floor','fbase', 'ftop', rimOp(c));    // the bright edge
-    layer('as-' + c + '-hl',   'base',  'top',  0.92, { layout: { visibility: 'none' } });
+    layer('as-' + c,           'base',  'top',  bodyOp(c), 0);        // the glass box
+    layer('as-' + c + '-hl',   'base',  'top',  0.92, 0, { layout: { visibility: 'none' } });
   });
 
   map.addLayer({
@@ -882,7 +938,6 @@ map.on('load', async () => {
   addLayers();
   makeAirports();
   initGizmo();
-  retuneExag(true);
   try {
     const r = await fetch('data/index.json', { cache: 'no-cache' });
     if (r.ok) {
@@ -900,18 +955,6 @@ map.on('moveend', () => {
 });
 map.on('rotate', syncCam);
 map.on('pitch', syncCam);
-function retuneExag(force) {
-  const want = exagAuto();
-  if (!force && Math.abs(want - state.exag) < 0.2) return;
-  state.exag = want;
-  if (state.feats.size) { map.getSource('airspace').setData(buildFC()); updatePlane(); }
-  const s = document.getElementById('status');
-  if (s && s.classList.contains('good'))
-    s.innerHTML = s.innerHTML.replace(/×[\d.]+$/, '×' + state.exag.toFixed(1));
-}
-map.on('zoom', () => retuneExag(false));
-map.on('resize', () => retuneExag(true));
-
 let labelTick;
 map.on('move', () => {
   if (!state.labelsOn || labelTick) return;
