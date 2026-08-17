@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[-139.782,59.6836],[-139.4892,59.5167],[-139.4536,59.4097],[-139.6106,59.3372],[-140.0256,59.5722],[-139.782,59.6836]]]},"properties":{"cls":"E","low":0,"high":18000,"agl":0,"open":1,"name":"Yakutat Class E2","hours":"H24"}}]}

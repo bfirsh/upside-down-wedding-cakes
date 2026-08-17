@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[-109.9876,47.5],[-110.0008,47.5],[-110.0008,48.2167],[-109.3675,48.3667],[-107.0006,48.0833],[-107.0006,47.5],[-109.9876,47.5]]]},"properties":{"cls":"SUA","low":300,"high":18000,"agl":1,"open":0,"name":"HAYS MOA · MOA","hours":"INTERMITTENT BY NOTAM"}}]}

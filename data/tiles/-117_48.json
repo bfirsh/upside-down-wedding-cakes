@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[-118.2428,48.325],[-119.0011,48.0583],[-119.0011,49],[-116.8011,49],[-117.4678,48.3667],[-118.1011,48.3667],[-118.2428,48.325]]]},"properties":{"cls":"SUA","low":9000,"high":18000,"agl":0,"open":0,"name":"ROOSEVELT A MOA · MOA","hours":"INTERMITTENT BY NOTAM"}}]}

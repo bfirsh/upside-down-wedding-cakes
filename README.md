@@ -35,9 +35,14 @@ republished on the 28-day chart cycle.
 That service is rate-limited (6,000 request units/minute, shared across every
 anonymous client), so the site doesn't query it at runtime. Instead
 [a GitHub Action](.github/workflows/refresh-airspace.yml) runs weekly, downloads the
-entire national dataset, normalises it, and commits it to `data/` as 5-degree tiles
+entire national dataset, normalises it, and commits it to `data/` as 1-degree tiles
 that GitHub Pages serves as plain static JSON. The page loads only the tiles covering
 your viewport. If `data/` is missing it falls back to querying the FAA live.
+
+The FAA tessellates arcs to roughly 5,000 vertices per circle, so the bake simplifies
+each boundary to the 11 m precision the coordinates are stored at — 97% fewer
+vertices, no boundary moved more than about 13 m. Together with the smaller tiles that
+takes the default Bay Area view from 14 MB of JSON to under 200 KB.
 
 Sectional charts are hotlinked from the FAA's
 [`VFR_Sectional`](https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/VFR_Sectional/MapServer)

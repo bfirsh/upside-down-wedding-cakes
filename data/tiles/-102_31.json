@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[-101.2503,31.3919],[-101.2503,30.9003],[-102.0003,30.9503],[-102.0003,31.4586],[-101.2503,31.3919]]]},"properties":{"cls":"SUA","low":6000,"high":18000,"agl":0,"open":0,"name":"TEXON MOA · MOA","hours":"SUNRISE - SUNSET, MON - FRI; OTHER TIMES BY NOTAM"}}]}
