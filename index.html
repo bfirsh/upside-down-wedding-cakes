@@ -183,6 +183,8 @@ button.wide.on{background:#ffd24a;border-color:#ffd24a;color:#1a1405}
   <label class="chk"><input type="checkbox" data-cls="SUA" checked><span class="sw" style="background:var(--SUA)"></span>Restricted · MOA <span class="cnt" id="nSUA">–</span></label>
   <label class="chk"><input type="checkbox" data-cls="E"><span class="sw" style="background:var(--E)"></span>Class E surface <span class="cnt" id="nE">–</span></label>
   <div class="ramp"><span>floor SFC</span><i></i><span>10,000</span></div>
+  <div class="sl"><div class="lb"><span>Fill</span><span id="fillV">100%</span></div>
+    <input type="range" id="fill" min="15" max="100" step="1" value="100"></div>
 
   <h2>Cut away</h2>
   <div class="sl"><div class="lb"><span>Hide everything above</span><span id="altV">3,500 ft</span></div>
@@ -206,7 +208,7 @@ button.wide.on{background:#ffd24a;border-color:#ffd24a;color:#1a1405}
     Each volume runs from its <b>floor to its ceiling in feet MSL</b>, with bright
     plates marking both. Within a class, pale means a low floor and dark a high one.
     Labels read ceiling/floor in hundreds, so <b>100/15</b> is 10,000 down to 1,500.
-    Heights are exaggerated 10× — read the numbers, not the apparent size — and the
+    Heights are exaggerated 6× — read the numbers, not the apparent size — and the
     ground is flat at sea level, so terrain is not modelled.<br><br>
     Drag the compass to spin, the bar beside it to tilt. Double-click to fly in.<br><br>
     <b>Not for navigation.</b> Verify against current charts and NOTAMs.<br><br>
@@ -316,10 +318,10 @@ const MAX_FEATURES = 6000;   // memory guard; past this we reset and reload the 
 // SUA is a status colour, not a categorical slot — it always ships with a label.
 const CLASSES = {
   B:   { on: true,  lo: '#9ecbf5', hi: '#14528f', w: 0.42, label: 'Class B' },
-  C:   { on: true,  lo: '#f0aac4', hi: '#8e2f56', w: 0.60, label: 'Class C' },
-  D:   { on: true,  lo: '#f2cf82', hi: '#8a5b00', w: 0.85, label: 'Class D' },
-  E:   { on: false, lo: '#c3c2b7', hi: '#6b6a63', w: 0.60, label: 'Class E surface' },
-  SUA: { on: true,  lo: '#f2a9a9', hi: '#a32d2c', w: 0.70, label: 'Restricted / MOA' }
+  C:   { on: true,  lo: '#f0aac4', hi: '#8e2f56', w: 0.68, label: 'Class C' },
+  D:   { on: true,  lo: '#f2cf82', hi: '#8a5b00', w: 0.88, label: 'Class D' },
+  E:   { on: false, lo: '#c3c2b7', hi: '#6b6a63', w: 0.55, label: 'Class E surface' },
+  SUA: { on: true,  lo: '#f2a9a9', hi: '#a32d2c', w: 0.80, label: 'Restricted / MOA' }
 };
 // Within a class, floor altitude drives lightness: low shelves light, high shelves
 // dark. That is what turns a fused blue lump into readable tiers.
@@ -358,7 +360,7 @@ const FRAMES = {
 };
 
 const state = {
-  exag: EXAG, opacity: 0.50, alt: 3500,
+  exag: EXAG, opacity: 1.0, alt: 3500,
   planeOn: false, sliceOn: false, labelsOn: true, airportsOn: true,
   orbitDrag: false, shape: 'solid', footOn: true, evenOp: false, clipOn: false,
   snapshot: null,            // data/index.json when a baked dataset is present
@@ -391,8 +393,8 @@ const map = new maplibregl.Map({
     }),
     layers: [
       { id:'bg', type:'background', paint:{ 'background-color':'#0d1117' } },
-      { id:'bm-sectional', type:'raster', source:'sectional' },
-      { id:'bm-tac',  type:'raster', source:'tac',  layout:{ visibility:'none' } },
+      { id:'bm-sectional', type:'raster', source:'sectional', paint:{ 'raster-opacity':0.70, 'raster-saturation':-0.35, 'raster-contrast':-0.15 } },
+      { id:'bm-tac',  type:'raster', source:'tac',  layout:{ visibility:'none' }, paint:{ 'raster-opacity':0.70, 'raster-saturation':-0.35, 'raster-contrast':-0.15 } },
       { id:'bm-sat',  type:'raster', source:'sat',  layout:{ visibility:'none' } },
       { id:'bm-topo', type:'raster', source:'topo', layout:{ visibility:'none' } }
     ]
@@ -1073,6 +1075,8 @@ document.querySelectorAll('[data-cls]').forEach(cb => cb.addEventListener('chang
   refresh();
 }));
 on('clip',   'change', e => { state.clipOn = e.target.checked; refresh(); });
+on('fill',   'input',  e => { state.opacity = +e.target.value / 100;
+  document.getElementById('fillV').textContent = e.target.value + '%'; refresh(); });
 
 
 document.querySelectorAll('[data-base]').forEach(b => b.addEventListener('click', e => {
