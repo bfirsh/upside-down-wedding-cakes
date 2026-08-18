@@ -64,9 +64,14 @@ const STACK = ['D', 'E', 'C', 'SUA', 'B'];
 const EXAG = 6;
 
 const HOME = { center: [-122.28, 37.56], zoom: 9.05, pitch: 66, bearing: 335 };
+// Top of the cut-away slider means "off". It used to be gated behind a separate
+// "Slice the sky here" checkbox, so dragging the slider on its own did nothing at
+// all except change a line of text — which read exactly like a broken control.
+// The slider now IS the cut-away, and its maximum is the off position.
+const CLIP_OFF = 12000;
 
 const state = {
-  exag: EXAG, opacity: 1.0, alt: 3500,
+  exag: EXAG, opacity: 1.0, alt: CLIP_OFF,
   planeOn: false, labelsOn: true, airportsOn: true, rimsOn: true,
   footOn: true, evenOp: false, clipOn: false,
   snapshot: null,            // data/index.json when a baked dataset is present
@@ -528,6 +533,10 @@ function updatePlane() {
 
 function updateReadout() {
   const el = document.getElementById('inside');
+  if (!state.clipOn) {
+    el.innerHTML = 'Drag to slice the sky at an altitude and see what you\u2019d be in.';
+    return;
+  }
   const names = new Set();
   state.feats.forEach(f => {
     const p = f.properties;
@@ -542,6 +551,19 @@ function updateReadout() {
 /* ================= DOM markers (no glyph server needed) ================= */
 let airportMarkers = [], labelMarkers = [];
 
+/* Past the horizon, map.project() still hands back a screen position — it just
+   lands up in the sky, which is where the stray labels were coming from. Nothing
+   in the public API says "is this point over the horizon", but the transform
+   itself has to know in order to draw the sky, so ask it. Shifting the test point
+   UP by a margin means "at least that many pixels below the horizon", which also
+   clears out the pile-up of infinitely-distant markers along the horizon line.
+   If MapLibre ever drops the method, fall back to culling nothing.            */
+function onGround(pt, margin) {
+  const tr = map.transform;
+  if (!tr || typeof tr.isPointOnMapSurface !== 'function') return true;
+  return tr.isPointOnMapSurface({ x: pt.x, y: pt.y - (margin || 0) });
+}
+
 // big: [code, name, lon, lat, elev]   ·   small: [code, lon, lat, name]
 function visibleAirports() {
   const z = map.getZoom();
@@ -554,7 +576,11 @@ function visibleAirports() {
   const small = z < 8.6 ? [] : AIRPORTS.s
     .filter(a => a[1] >= W && a[1] <= E && a[2] >= S && a[2] <= N)
     .map(a => ({ id:a[0], n:a[3], lon:a[1], lat:a[2], big:false }));
-  return big.concat(small).slice(0, 140);
+  // Cull over-the-horizon ones BEFORE the cap, or at high pitch most of the 140
+  // slots go to airports floating in the sky.
+  return big.concat(small)
+    .filter(a => onGround(map.project([a.lon, a.lat]), 12))
+    .slice(0, 140);
 }
 
 function makeAirports() {
@@ -605,6 +631,7 @@ function updateLabels() {
     if (!f._c) { f._c = centroid(f.geometry); f._a = areaOf(f.geometry); }
     const pt = map.project(f._c);
     if (pt.x < 60 || pt.y < 20 || pt.x > W - 20 || pt.y > H - 40) return;
+    if (!onGround(pt, 14)) return;
     cand.push({ f, pt });
   });
 
@@ -825,14 +852,18 @@ const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
 
 function syncCam() { if (window.__syncGizmo) window.__syncGizmo(); }
 
-on('alt',  'input', e => { state.alt = +e.target.value; $('altV').textContent = state.alt.toLocaleString() + ' ft'; refresh(); });
+on('alt', 'input', e => {
+  state.alt = +e.target.value;
+  state.clipOn = state.alt < CLIP_OFF;
+  $('altV').textContent = state.clipOn ? state.alt.toLocaleString() + ' ft' : 'off';
+  refresh();
+});
 
 document.querySelectorAll('[data-cls]').forEach(cb => cb.addEventListener('change', e => {
   CLASSES[e.target.dataset.cls].on = e.target.checked;
   if (e.target.dataset.cls === 'E' && e.target.checked) loadView(false);
   refresh();
 }));
-on('clip',   'change', e => { state.clipOn = e.target.checked; refresh(); });
 on('fill',   'input',  e => { state.opacity = +e.target.value / 100;
   document.getElementById('fillV').textContent = e.target.value + '%'; refresh(); });
 
