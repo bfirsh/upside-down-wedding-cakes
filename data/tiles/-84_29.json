@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[-82.6719,29.8003],[-83.0997,29.8003],[-83.55,30.3836],[-82.6664,30.3836],[-82.6497,30.2336],[-82.6719,29.8003]]]},"properties":{"cls":"SUA","low":8000,"high":18000,"agl":0,"open":0,"name":"LIVE OAK MOA · MOA","hours":"0600 - 0200, MON - FRI; OTHER TIMES BY NOTAM"}}]}

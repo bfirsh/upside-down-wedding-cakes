@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[-92,30.2503],[-91.6833,30.0003],[-89,30.0003],[-89,29.0003],[-95.0003,29.0003],[-95.0003,30.0003],[-92.3333,30.0003],[-92,30.2503]]]},"properties":{"cls":"SUA","low":0,"high":2000,"agl":0,"open":0,"name":"A-381 · Alert","hours":"SUNRISE - SUNSET, DAILY"}}]}

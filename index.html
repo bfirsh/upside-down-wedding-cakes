@@ -205,11 +205,14 @@ button.wide.on{background:#ffd24a;border-color:#ffd24a;color:#1a1405}
   </div>
 
   <div class="note">
-    Each volume runs from its <b>floor to its ceiling in feet MSL</b>, with bright
-    plates marking both. Within a class, pale means a low floor and dark a high one.
+    Each volume runs from its <b>floor to its ceiling in feet MSL</b>, with a thin
+    bright rim at both. Within a class, pale means a low floor and dark a high one.
     Labels read ceiling/floor in hundreds, so <b>100/15</b> is 10,000 down to 1,500.
     Heights are exaggerated 6× — read the numbers, not the apparent size — and the
     ground is flat at sea level, so terrain is not modelled.<br><br>
+    The SFO Bravo is capped flat at 10,000 across all 17 of its areas, so its shape
+    is in the <b>floor</b>: tilt over and look underneath to see it step down toward
+    the airport.<br><br>
     Drag the compass to spin, the bar beside it to tilt. Double-click to fly in.<br><br>
     <b>Not for navigation.</b> Verify against current charts and NOTAMs.<br><br>
     Airspace and charts: <a href="https://adds-faa.opendata.arcgis.com/" target="_blank"
@@ -240,7 +243,7 @@ button.wide.on{background:#ffd24a;border-color:#ffd24a;color:#1a1405}
   </div>
 </div>
 
-<div id="hint">Right-drag to tilt &amp; rotate &mdash; or switch the big button to <b>Drag to tilt &amp; rotate</b></div>
+<div id="hint">Left-drag to pan &mdash; <b>right-drag to tilt &amp; rotate</b> &mdash; double-click to fly in</div>
 
 <script>/**
  * MapLibre GL JS
@@ -340,8 +343,27 @@ function mix(a, b, t) {
   return '#' + c(r1 + (r2 - r1) * t) + c(g1 + (g2 - g1) * t) + c(b1 + (b2 - b1) * t);
 }
 
-// later is drawn on top, so the small low stuff wins
-const DRAW = ['B', 'C', 'SUA', 'E', 'D'];
+/* Draw order is the whole ballgame, and it is not what it looks like.
+ *
+ * fill-extrusion is depth-tested AND depth-writing, and MapLibre draws layers in
+ * stack order. So a layer drawn EARLIER occludes anything drawn later that sits
+ * behind it — even when that earlier layer is nearly transparent. Class B used to
+ * be first in the stack, which meant every Class C and D underneath the Bravo
+ * failed the depth test and was thrown away. The basemap still showed through,
+ * because a raster writes no depth. That is exactly the "I can see the ground but
+ * not the Class D" symptom: it was never an opacity problem.
+ *
+ * The fix is to draw strictly back-to-front for a camera above the stack, i.e.
+ * lowest floor first. Opacity has to stay a per-layer property (alpha inside
+ * fill-extrusion-color is ignored by MapLibre — verified, it renders opaque), so
+ * "sorted" has to mean one layer per floor band per class, emitted in order.
+ *
+ * Bands are cut where Bay Area airspace actually stacks: Class D and C floors sit
+ * at SFC/1,500/2,500, and the SFO Bravo's 17 shelves floor at 1,500 through 8,000.
+ */
+const BANDS = [0, 1500, 2500, 3500, 5000, 7000, 9000, 12000, 1e9];
+// Within one band the same back-to-front rule applies, so the big high lids go last.
+const STACK = ['D', 'E', 'C', 'SUA', 'B'];
 // ONE fixed vertical scale, deliberately. An earlier version derived this from the
 // view width so every frame was individually optimal — and it was wrong: zooming
 // changed the shape of the thing you were trying to learn. Constancy of the object
@@ -349,20 +371,12 @@ const DRAW = ['B', 'C', 'SUA', 'E', 'D'];
 // whole sectional, so it is simply constant.
 const EXAG = 6;
 
-const opacityFor = c => Math.min(0.97, state.opacity * (state.evenOp ? 1 : CLASSES[c].w));
-
 const HOME = { center: [-122.28, 37.56], zoom: 9.05, pitch: 66, bearing: 335 };
-const FRAMES = {
-  over:    { pitch: 15 },
-  tilt:    { pitch: 70 },
-  low:     { pitch: 82 },
-  profile: { pitch: 85 }
-};
 
 const state = {
   exag: EXAG, opacity: 1.0, alt: 3500,
-  planeOn: false, sliceOn: false, labelsOn: true, airportsOn: true,
-  orbitDrag: false, shape: 'solid', footOn: true, evenOp: false, clipOn: false,
+  planeOn: false, labelsOn: true, airportsOn: true, rimsOn: true,
+  footOn: true, evenOp: false, clipOn: false,
   snapshot: null,            // data/index.json when a baked dataset is present
   tilesLoaded: new Set(),
   feats: new Map(),          // dedupe key -> feature
@@ -403,6 +417,7 @@ const map = new maplibregl.Map({
   maxPitch: 85, antialias: true, attributionControl: { compact: true }
 });
 window.map = map;   // handy for debugging and automated screenshots
+window.state = state;
 map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
 map.addControl(new maplibregl.ScaleControl({ unit: 'imperial' }), 'bottom-left');
 map.addControl(new maplibregl.GeolocateControl({ trackUserLocation: false }), 'top-right');
@@ -563,19 +578,38 @@ function tilesFor(box, deg) {
 async function loadTiles() {
   const snap = state.snapshot;
   const box = viewBox(0.35);
+  const cx = (box.xmin + box.xmax) / 2, cy = (box.ymin + box.ymax) / 2;
   const want = tilesFor(box, snap.tileDegrees)
-    .filter(k => snap.tiles[k] && !state.tilesLoaded.has(k));
+    .filter(k => snap.tiles[k] && !state.tilesLoaded.has(k))
+    // nearest first, so what you are actually looking at appears before the edges
+    .sort((a, b) => {
+      const d = k => { const [x, y] = k.split('_').map(Number);
+                       return (x - cx) ** 2 + (y - cy) ** 2; };
+      return d(a) - d(b);
+    });
   if (!want.length) return false;
+
   status('Loading airspace…');
-  for (const k of want) {
-    try {
-      const r = await fetch('data/tiles/' + k + '.json');
-      if (!r.ok) throw new Error(r.status);
-      const fc = await r.json();
-      (fc.features || []).forEach(f => { const h = hydrate(f); state.feats.set(h.key, h); });
-      state.tilesLoaded.add(k);
-    } catch (e) { /* a missing tile just means no airspace there */ }
-  }
+  // Claim the keys up front so an overlapping moveend can't queue them twice, and
+  // fetch a few at a time: these are small static files, serialising them was the
+  // single biggest reason the Bay Area took so long to appear.
+  want.forEach(k => state.tilesLoaded.add(k));
+  const v = encodeURIComponent(snap.generated || '');   // cache-bust the weekly refresh
+  const queue = want.slice();
+  const worker = async () => {
+    for (let k; (k = queue.shift()) !== undefined; ) {
+      try {
+        const r = await fetch('data/tiles/' + k + '.json?v=' + v);
+        if (!r.ok) throw new Error(r.status);
+        const fc = await r.json();
+        (fc.features || []).forEach(f => { const h = hydrate(f); state.feats.set(h.key, h); });
+      } catch (e) {
+        state.tilesLoaded.delete(k);   // let a later pass retry it
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(6, want.length) }, worker));
+
   const when = new Date(snap.generated).toLocaleDateString(undefined,
     { year: 'numeric', month: 'short', day: 'numeric' });
   status('<span class="ok"></span>' + state.feats.size + ' volumes · FAA ' + when +
@@ -662,82 +696,106 @@ async function loadView(force) {
 
 /* ================= rendering ================= */
 
-/* ---- edge bands ------------------------------------------------------------
-   A "floor plate" spanning the whole polygon is a solid sheet lying directly on
-   top of whatever is underneath — measured, a Bravo's floor plate let only 21% of
-   the light through to the Class D below it. So the rims are rings, not plates:
-   the polygon with an inward-offset copy punched out as a hole. You still get a
-   crisp bright edge at the floor and ceiling, but the middle is open sky.        */
-function offsetRing(ring, d, lat) {
-  const kx = 1 / Math.max(0.2, Math.cos(lat * Math.PI / 180));
-  const n = ring.length - 1;                       // ring is closed
-  if (n < 3) return null;
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    const p = ring[i], a = ring[(i - 1 + n) % n], b = ring[(i + 1) % n];
-    const e1x = (p[0] - a[0]) / kx, e1y = p[1] - a[1];
-    const e2x = (b[0] - p[0]) / kx, e2y = b[1] - p[1];
-    const l1 = Math.hypot(e1x, e1y) || 1, l2 = Math.hypot(e2x, e2y) || 1;
-    // right-hand normals of the two edges, averaged into the corner bisector
-    let bx = (e1y / l1) + (e2y / l2), by = -(e1x / l1) - (e2x / l2);
-    const bl = Math.hypot(bx, by);
-    if (bl < 1e-9) { bx = e1y / l1; by = -e1x / l1; } else { bx /= bl; by /= bl; }
-    out.push([p[0] + bx * d * kx, p[1] + by * d]);
-  }
-  out.push(out[0].slice());
-  return out;
-}
-
 const ringArea = r => {
   let s = 0;
   for (let i = 0, n = r.length - 1; i < n; i++) s += r[i][0] * r[i + 1][1] - r[i + 1][0] * r[i][1];
   return Math.abs(s) / 2;
 };
 
-// Offset inward whichever way shrinks the ring, and bail out if the result folds
-// in on itself — a thin or spiky polygon just keeps its solid plate, which costs
-// nothing because it was never big enough to hide anything.
-function bandFor(poly, lat) {
-  const build = (rings) => {
-    const outer = rings[0];
-    const A = ringArea(outer);
-    if (A < 1e-6) return null;
-    const d = Math.min(0.010, Math.max(0.0016, Math.sqrt(A) * 0.10));
-    let best = null;
-    for (const s of [d, -d]) {
-      const inner = offsetRing(outer, s, lat);
-      if (!inner) continue;
-      const ia = ringArea(inner);
-      if (ia < A * 0.97 && ia > A * 0.12) { best = inner; break; }
+/* ---- rim ribbons -----------------------------------------------------------
+   A translucent box on its own is fog; what makes glass read as a solid is its
+   edges. Two earlier attempts at this failed and are worth not repeating: full
+   floor/ceiling PLATES were opaque sheets lying on whatever was below (a Bravo's
+   floor plate left 21% of the light for the Class D under it), and an inward-
+   OFFSET RING punched out as a hole self-intersected on concave and holed
+   shelves, tessellating into visible wedges.
+
+   So build the ribbon per segment instead of per ring. Each edge becomes its own
+   little quad, using the corner bisector at each end so neighbouring quads share
+   an edge exactly — no overlap to z-fight, no gap, and nothing global that can
+   fold in on itself. A concave corner at worst produces one bent quad, which is a
+   local nudge rather than a corrupted polygon. Area is perimeter x width, so a
+   ribbon hides essentially nothing of whatever is underneath it.               */
+function ribbonRing(ring, w, kx) {
+  const n = ring.length - 1;                        // ring is closed
+  if (n < 3) return [];
+  const nx = [], ny = [];
+  for (let i = 0; i < n; i++) {
+    const p = ring[i], a = ring[(i - 1 + n) % n], b = ring[(i + 1) % n];
+    const e1x = (p[0] - a[0]) * kx, e1y = p[1] - a[1];
+    const e2x = (b[0] - p[0]) * kx, e2y = b[1] - p[1];
+    const l1 = Math.hypot(e1x, e1y) || 1, l2 = Math.hypot(e2x, e2y) || 1;
+    let bx = (e1y / l1) + (e2y / l2), by = -(e1x / l1) - (e2x / l2);
+    const bl = Math.hypot(bx, by);
+    if (bl < 1e-6) { bx = e1y / l1; by = -e1x / l1; }
+    else {
+      // Normalise, then undo the foreshortening of a sharp corner — but clamp it,
+      // because a hairpin would otherwise throw the corner off to infinity.
+      const miter = Math.min(3, 1 / Math.max(0.34, bl / 2));
+      bx = bx / bl * miter; by = by / bl * miter;
     }
-    return best ? [outer, best] : null;
-  };
-  if (poly.type === 'Polygon') {
-    const r = build(poly.coordinates);
-    return r ? { type: 'Polygon', coordinates: r } : null;
+    nx.push(bx); ny.push(by);
   }
-  const polys = [];
-  for (const pc of poly.coordinates) {
-    const r = build(pc);
-    if (r) polys.push(r);
+  const quads = [];
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const p = ring[i], q = ring[j];
+    const ax = nx[i] * w / kx, ay = ny[i] * w;
+    const bx = nx[j] * w / kx, by = ny[j] * w;
+    quads.push([[
+      [p[0] - ax, p[1] - ay], [q[0] - bx, q[1] - by],
+      [q[0] + bx, q[1] + by], [p[0] + ax, p[1] + ay],
+      [p[0] - ax, p[1] - ay]
+    ]]);
   }
-  return polys.length ? { type: 'MultiPolygon', coordinates: polys } : null;
+  return quads;
+}
+
+// One ribbon width per volume, scaled to how big the volume is, so a 5 NM Class D
+// and a 50 NM Bravo both read at their own natural zoom instead of one looking
+// like a hairline and the other like a wall. The cap matters: measured, a wide
+// Bravo rim was costing a third of the light reaching the Class D underneath it,
+// which is the exact mistake the floor plates made. Keep rims thin.
+function ribbonFor(geom, lat) {
+  const kx = Math.max(0.2, Math.cos(lat * Math.PI / 180));
+  const rings = geom.type === 'Polygon' ? geom.coordinates
+              : geom.coordinates.reduce((a, p) => a.concat(p), []);
+  let area = 0;
+  for (const r of rings) area = Math.max(area, ringArea(r));
+  if (!(area > 0)) return null;
+  const w = Math.min(0.0075, Math.max(0.0010, Math.sqrt(area) * 0.016)) / 2;
+  const quads = [];
+  for (const r of rings) {
+    for (const q of ribbonRing(r, w, kx)) quads.push(q);
+  }
+  return quads.length ? { type: 'MultiPolygon', coordinates: quads } : null;
 }
 
 function buildFC() {
   const feats = [];
   const clip = state.clipOn ? state.alt : Infinity;
   state.feats.forEach(f => {
-    if (!CLASSES[f.properties.cls].on) return;
-    if (f.properties.low >= clip) return;
-    const lo = f.properties.low * FT * state.exag;
-    const hi = Math.min(f.properties.high, clip) * FT * state.exag;
-    const slab = Math.max(12 * state.exag, Math.min(26 * state.exag, (hi - lo) * 0.10));
-    const props = Object.assign({}, f.properties, {
-      base: lo, top: hi, fbase: lo, ftop: lo + slab, cbase: hi - slab, ctop: hi
-    });
-    feats.push({ type: 'Feature', geometry: f.geometry, properties: Object.assign({ rim: 0 }, props) });
+    const p = f.properties;
+    if (!CLASSES[p.cls].on) return;
+    if (p.low >= clip) return;
+    const lo = p.low * FT * state.exag;
+    const hi = Math.min(p.high, clip) * FT * state.exag;
+    feats.push({ type: 'Feature', geometry: f.geometry,
+                 properties: Object.assign({}, p, { rim: 0, base: lo, top: hi }) });
 
+    if (!state.rimsOn) return;
+    if (!f._c) { f._c = centroid(f.geometry); f._a = areaOf(f.geometry); }
+    if (f._rib === undefined) f._rib = ribbonFor(f.geometry, f._c[1]);
+    if (!f._rib) return;
+    // A rim is a thin slab, not a plate: thick enough to catch the eye from a
+    // shallow angle, thin enough that it never reads as a surface. It STRADDLES
+    // the boundary it marks rather than sitting inside it — flush faces would be
+    // coplanar with the box's own floor and ceiling and z-fight with them.
+    const t = 55 * FT * state.exag;
+    const rim = (z) => feats.push({ type: 'Feature', geometry: f._rib,
+      properties: Object.assign({}, p, { rim: 1, base: z - t / 2, top: z + t / 2 }) });
+    rim(lo);                                          // floor: the shape that matters
+    if (hi - lo > t * 3) rim(hi);                     // ceiling, if there's room for it
   });
   return { type: 'FeatureCollection', features: feats };
 }
@@ -746,25 +804,18 @@ function refresh() {
   if (!map.getSource('airspace')) return;
   map.getSource('airspace').setData(buildFC());
 
-  const S = state.shape;                       // solid | shells | floors
   Object.keys(CLASSES).forEach(c => {
-    const on = CLASSES[c].on;
-    const vis = v => (on && v) ? 'visible' : 'none';
-    const set = (id, v, op) => {
+    const vis = CLASSES[c].on ? 'visible' : 'none';
+    const set = (id, op) => {
       if (!map.getLayer(id)) return;
-      map.setLayoutProperty(id, 'visibility', vis(v));
-      if (op != null) map.setPaintProperty(id, 'fill-extrusion-opacity', op);
+      map.setLayoutProperty(id, 'visibility', vis);
+      map.setPaintProperty(id, 'fill-extrusion-opacity', op);
     };
-    set('as-' + c, true, bodyOp(c));
+    (LAYERS.body[c] || []).forEach(id => set(id, bodyOp(c)));
+    (LAYERS.rim[c]  || []).forEach(id => set(id, state.rimsOn ? rimOp(c) : 0));
     if (map.getLayer('as-' + c + '-foot'))
-      map.setLayoutProperty('as-' + c + '-foot', 'visibility', vis(state.footOn));
-    if (map.getLayer('as-' + c + '-hl')) {
-      map.setLayoutProperty('as-' + c + '-hl', 'visibility', vis(state.sliceOn));
-      map.setFilter('as-' + c + '-hl', ['all',
-        ['==', ['get', 'cls'], c], ['==', ['get', 'rim'], 0],
-        ['<=', ['get', 'low'], state.alt],
-        ['>',  ['get', 'high'], state.alt]]);
-    }
+      map.setLayoutProperty('as-' + c + '-foot', 'visibility',
+        (CLASSES[c].on && state.footOn) ? 'visible' : 'none');
   });
   updatePlane();
   updateLabels();
@@ -884,45 +935,60 @@ function updateLabels() {
 }
 
 /* ================= layers =================
-   A translucent box on its own is fog: overlap two and you get one blob. What makes
-   a glass solid readable is its EDGES. So every volume is drawn four times —
-   a very faint body, a bright plate at the floor, a softer plate at the ceiling,
-   and its outline on the ground — and the eye reassembles the box from the rims.  */
+   Every volume is drawn as a glass box plus a thin bright rim at its floor and
+   ceiling, with its outline on the ground underneath. The rims are what let the
+   eye reassemble a box out of fog — and for the modern SFO Bravo they are the
+   whole point, because all 17 of its areas are capped at 10,000 and the shape
+   lives entirely in the stepped floor underneath.
+
+   Order matters more than any of the paint: see the BANDS comment at the top. */
 
 const bodyOp = c => Math.min(0.55, state.opacity * (state.evenOp ? 1 : CLASSES[c].w));
-const rimOp  = c => 0.92;   // safe to be solid: a band hides almost nothing
+// A rim can afford to be near-solid — it is perimeter x a few hundred metres, so
+// it hides essentially nothing of whatever is underneath it.
+const rimOp  = c => Math.min(0.95, 0.5 + 0.45 * state.opacity);
+
+const LAYERS = { body: {}, rim: {} };
 
 function addLayers() {
-  DRAW.forEach(c => {
-    const common = {
-      type: 'fill-extrusion', source: 'airspace',
-      paint: {
-        'fill-extrusion-color': rampFor(c),
-        'fill-extrusion-vertical-gradient': false
-      }
-    };
-    const layer = (id, baseKey, topKey, op, rim, extra) => map.addLayer({
-      id, ...common,
-      filter: ['all', ['==', ['get', 'cls'], c], ['==', ['get', 'rim'], rim]],
-      layout: extra?.layout || {},
-      paint: Object.assign({}, common.paint, {
-        'fill-extrusion-base':   ['get', baseKey],
-        'fill-extrusion-height': ['get', topKey],
-        'fill-extrusion-opacity': op
-      })
-    });
-
-    // footprint on the ground: says WHERE the thing is, whatever the 3D is doing
+  // Footprints first, on the ground: they say WHERE everything is regardless of
+  // what the 3D is doing, and every box above tints them as it should.
+  Object.keys(CLASSES).forEach(c => {
     map.addLayer({
       id: 'as-' + c + '-foot', type: 'line', source: 'airspace',
       filter: ['all', ['==', ['get', 'cls'], c], ['==', ['get', 'rim'], 0]],
       layout: { 'line-join': 'round' },
       paint: { 'line-color': rampFor(c), 'line-width': 1.6, 'line-opacity': 0.9 }
     });
-
-    layer('as-' + c,           'base',  'top',  bodyOp(c), 0);        // the glass box
-    layer('as-' + c + '-hl',   'base',  'top',  0.92, 0, { layout: { visibility: 'none' } });
+    LAYERS.body[c] = [];
+    LAYERS.rim[c] = [];
   });
+
+  // Lowest floor band first. Within a band: rims before their own bodies (a floor
+  // rim sits behind its own ceiling and would otherwise be depth-culled by it),
+  // and the tall lids last.
+  for (let b = 0; b < BANDS.length - 1; b++) {
+    for (const c of STACK) {
+      const band = [['>=', ['get', 'low'], BANDS[b]], ['<', ['get', 'low'], BANDS[b + 1]]];
+      const layer = (kind, rim, op) => {
+        const id = 'as-' + c + '-' + kind + b;
+        map.addLayer({
+          id, type: 'fill-extrusion', source: 'airspace',
+          filter: ['all', ['==', ['get', 'cls'], c], ['==', ['get', 'rim'], rim], ...band],
+          paint: {
+            'fill-extrusion-color': rampFor(c),
+            'fill-extrusion-vertical-gradient': false,
+            'fill-extrusion-base': ['get', 'base'],
+            'fill-extrusion-height': ['get', 'top'],
+            'fill-extrusion-opacity': op
+          }
+        });
+        return id;
+      };
+      LAYERS.rim[c].push(layer('r', 1, rimOp(c)));
+      LAYERS.body[c].push(layer('', 0, bodyOp(c)));
+    }
+  }
 
   map.addLayer({
     id: 'alt-plane', type: 'fill-extrusion', source: 'plane',
@@ -967,7 +1033,7 @@ map.on('move', () => {
 const popup = new maplibregl.Popup({ closeButton: true, maxWidth: '290px' });
 map.on('click', e => {
   const layers = Object.keys(CLASSES)
-    .flatMap(c => ['as-' + c, 'as-' + c + '-hl']).filter(id => map.getLayer(id));
+    .flatMap(c => LAYERS.body[c] || []).filter(id => map.getLayer(id));
   const hits = map.queryRenderedFeatures(e.point, { layers });
   if (!hits.length) return popup.remove();
   const seen = new Set();

@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[-114.4508,40.6],[-114.4508,39.3833],[-115.1,39.8611],[-115.1,40.4083],[-114.85,40.6],[-114.4508,40.6]]]},"properties":{"cls":"SUA","low":14000,"high":18000,"agl":0,"open":0,"name":"WHITE ELK MOA · MOA","hours":"0730 - 2200, MON - THU; 0730 - 1630, FRI; OTHER TIMES BY NOTAM"}}]}

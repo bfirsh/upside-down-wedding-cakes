@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[-97.0003,40.2],[-98.167,40.05],[-98.167,40.4],[-97.3086,40.65],[-97.0003,40.4583],[-97.0003,40.2]]]},"properties":{"cls":"SUA","low":8000,"high":18000,"agl":0,"open":0,"name":"LINCOLN MOA · MOA","hours":"BY NOTAM, NORMALLY 0900 - 1600, TUE - SUN"}}]}

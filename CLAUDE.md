@@ -23,7 +23,9 @@ python3 build.py                                       # → index.html (~1.7 MB
 | `src/shell.html` | markup + all CSS, with `/*__MLCSS__*/ /*__MLJS__*/ /*__APTS__*/ /*__APP__*/` slots |
 | `src/app.js` | all logic |
 | `src/ap.json` | 917 large/medium + 13,160 small US airports, from [OurAirports](https://ourairports.com/data/) (public domain) |
-| `scripts/build-data.mjs` | downloads + tiles the national airspace dataset |
+| `scripts/build-data.mjs` | downloads, simplifies + tiles the national airspace dataset |
+| `scripts/lib/geom.mjs` | RDP simplification + tiling, shared by the two scripts below |
+| `scripts/retile.mjs` | re-simplifies/re-tiles whatever is in `data/` without re-downloading |
 | `.github/workflows/refresh-airspace.yml` | runs that weekly, commits `data/` |
 
 MapLibre is vendored, not CDN-loaded, so the file works offline and can't break when
@@ -38,11 +40,26 @@ Airspace comes from FAA Aeronautical Information Services:
 - Sectional/TAC raster tiles: `https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/VFR_Sectional/MapServer` (also `VFR_Terminal`, `IFR_High`, `IFR_AreaLow`)
 
 **The page does not query that service at runtime any more.** The Action bakes the
-whole country into `data/tiles/<lon>_<lat>.json` on a 5° grid plus `data/index.json`,
-and the page loads only the tiles covering the viewport. Current bake: **3,671
-volumes** — 423 B, 411 C, 652 D, 855 surface E, 1,330 SUA — in 114 tiles. If `data/`
+whole country into `data/tiles/<lon>_<lat>.json` on a **1° grid** plus `data/index.json`,
+and the page loads only the tiles covering the viewport, six at a time, nearest
+first, with `?v=<generated>` for cache-busting. Current bake: **3,667 volumes** —
+423 B, 411 C, 652 D, 854 surface E, 1,327 SUA — in 1,353 tiles, 10.7 MB. If `data/`
 is missing the page falls back to live viewport queries (`loadView()`), which still
 works but is rate-limited.
+
+**Simplify the geometry or nothing else matters.** The FAA tessellates arcs into
+polylines at absurd density — a plain 5 NM Class D circle arrives as ~5,000
+vertices, San Jose's Class C as 4,535, Stockton's Class D as 5,405. Baked raw at 5°
+that made the Bay Area tile **4.2 MB for 112 volumes**, and the default view pulled
+**14 MB** of JSON before a single box could be drawn. `scripts/lib/geom.mjs` runs
+Ramer–Douglas–Peucker at 0.00012° (~13 m, which is the precision the coordinates are
+already rounded to): **6.35 M → 197 K vertices, 96.9% smaller**, no boundary moved
+more than 13.3 m, and the polygonal Bravo shelves are barely touched (35 → 33
+points). With 1° tiles the default view is now **0.18 MB**. Do not remove this step.
+
+RDP runs iteratively, not recursively, because a 5,000-point ring overflows the
+stack; and rings are split at their two most distant vertices before simplifying, so
+the anchor is a real corner rather than an arbitrary start vertex leaving a flat spot.
 
 ### Five traps in the FAA data — all of these bit me
 
@@ -64,23 +81,61 @@ and is pure visual noise. Offshore Warning areas (`TYPE_CODE` starting `W`) too.
 
 ## Rendering — the decisions that matter
 
+**Layer order is depth order, and getting it wrong deletes airspace.** This was the
+bug behind "I can see the map on the ground but not the Class D". `fill-extrusion`
+is depth-tested *and* depth-writing, and MapLibre draws layers in stack order, so a
+layer drawn **earlier** occludes anything drawn later that sits behind it — no
+matter how transparent it is. `DRAW` used to be `['B','C','SUA','E','D']` with the
+comment "later is drawn on top, so the small low stuff wins". That is true of 2D
+fills and exactly backwards for extrusions: Class B went down first, and every
+Class C and D underneath the Bravo failed the depth test and was thrown away. The
+basemap still showed through because a raster writes no depth — which is precisely
+what made it look like an opacity problem.
+
+Verify it in ten lines if you ever doubt it: two overlapping extrusions, big
+translucent lid and small box beneath. Lid first → the box is *gone*. Box first →
+it reads perfectly through the lid.
+
+So volumes are now drawn strictly back-to-front for a camera above the stack:
+lowest floor first. Opacity has to stay a per-layer property — **alpha inside
+`fill-extrusion-color` is ignored by MapLibre**, it renders fully opaque (tested) —
+so "sorted" means one layer per (floor band × class), emitted in order. That is
+`BANDS` × `STACK` in `app.js`, ~91 layers. Measured on the peninsula, the share of
+a Class D's own contrast that survives under the Bravo went **14% → 52%** looking
+down (and the residual 14% in the old build was only the ground footprint *line*,
+not the volume). Near-plan with rims off it measures 58.8%, which is exactly the
+0.58 transmittance of one 0.42-opacity Bravo lid — i.e. the physics is now right,
+and the old per-class opacity weights do what they were always meant to do.
+
+**Rim ribbons, built per segment.** Each volume gets a thin bright slab at its floor
+and ceiling. This is the third attempt at edges and the first that works, so note
+what the other two got wrong: full floor/ceiling **plates** were opaque sheets lying
+on everything below (a Bravo's floor plate left 21% of the light for the Class D);
+an inward-**offset ring** punched out as a hole self-intersected on concave and
+holed shelves and tessellated into visible wedges. The fix is to stop building
+anything global — each edge becomes its own quad, using the corner bisector at both
+ends so neighbouring quads share an edge exactly. No overlap to z-fight, no gap, and
+a bad corner is one bent quad rather than a corrupted polygon. Rims **straddle** the
+boundary they mark; flush faces would be coplanar with the box's own floor/ceiling
+and z-fight with them.
+
+Keep rims thin — this is the same trap as the plates. Width is `sqrt(area) × 0.016`
+capped at 0.0075°; at the first, wider setting the Bravo's rim was costing a third
+of the light reaching the Class D underneath, measurably.
+
 **Fixed 6× vertical exaggeration (`EXAG` in app.js).** I once made this adapt to view
 width so every frame was individually optimal. It was wrong and was caught
 immediately: zooming changed the *shape of the object he was trying to learn*.
 Constancy of the object beats per-frame prettiness. Don't reintroduce this.
 
-**Solid glass boxes, no floor/ceiling plates.** Each volume is one `fill-extrusion`
-from floor to ceiling, plus a ground-level `line` footprint. I previously drew bright
-thin plates at the floor and ceiling for crispness — they looked great and were
+**Never full-area plates.** Kept here because it is the mistake most likely to be
+made again: bright thin plates at the floor and ceiling look great and are
 catastrophic, because a Class B's floor plate is a full-area opaque-ish sheet lying
 directly on top of every Class D beneath it. Measured budget: ceiling plate 0.42 ×
 body 0.084 × floor plate 0.60 left **21%** of light reaching the Class D, which then
-contributed **3.6% of the pixel**. Invisible at any body opacity. I tried rebuilding
-the plates as edge *bands* (polygon with an inward-offset ring punched out — the
-`offsetRing`/`bandFor` code is still in `app.js`, unused) and it measured fine but
-self-intersected on concave and holed shelves, producing visible wedges. Both plates
-are gone. If you want crisper edges, that band code is the starting point, but it
-needs a real polygon-offset library.
+contributed **3.6% of the pixel**. Invisible at any body opacity. The rim ribbons
+above are the replacement — anything you add at a volume's floor or ceiling has to
+be *perimeter*-sized, not *area*-sized.
 
 **Per-class opacity weights** (`CLASSES[].w`, multiplied by the `Fill` slider). Class B
 is the big lid you look *through*, so it's thinnest (0.42); Class D is small, low, and
@@ -125,8 +180,14 @@ cut-away, search, basemap. The dead `state` flags for the removed features are s
 
 - **SFO Class B was redesigned effective 16 Aug 2018** into a route-based design with
   **17 areas, A–Q**, all capped at 10,000 MSL. Lots of third-party datasets still ship
-  the old 11-area wedding cake. I developed against a 2013 snapshot, so **nobody has
-  yet looked at how the real 17-area Bravo renders** — that's the first thing to check.
+  the old 11-area wedding cake.
+- **The current bake has all 17, and the shape is entirely in the floor.** Floors in
+  the data are SFC / 1,500 / 1,600 / 2,100 / 2,300 / 3,000 (×2) / 4,000 / 5,000 (×2) /
+  6,000 (×2) / 7,000 (×2) / 8,000 (×2), every one of them topping out at 10,000. So
+  from above it is a flat lid and there is nothing to see; **you have to get under it**,
+  which is what the whole draw-order and rim work above is for. It is a genuinely
+  upside-down wedding cake in a way the pre-2018 design was not. The shelves are also
+  cheap geometry (4–35 points each) — it is the Class C/D circles that were huge.
 - OAK Class C ceiling is **4,000**, not 2,100 (a popular old dataset gets this wrong).
 - **SQL and PAO revert to Class G when the tower closes**, while HWD/NUQ/SJC get
   part-time Class E surface areas. Real difference in night VFR minimums.
@@ -134,14 +195,25 @@ cut-away, search, basemap. The dead `state` flags for the removed features are s
 
 ## Open items
 
-1. **Verify the real 17-area Bravo reads well.** Never seen it rendered.
-2. **Is 6× the right constant?** One number at the top of `app.js`.
-3. Footer text and `README` may still say 10× in places — grep for it.
-4. The cut-away slider ("hide everything above") — it's been questioned whether it
-   earns its place now that see-through works. Still an open call.
-5. `data/` has no cache-busting; browsers may hold stale tiles for a while after a
-   weekly refresh.
-6. Class E surface areas are fetched and tiled but off by default.
+1. **Is 6× the right constant?** One number at the top of `app.js`.
+2. The cut-away slider ("hide everything above") — it's been questioned whether it
+   earns its place now that see-through works. Still an open call, and more open than before: see-through
+   now genuinely works, so the slider has less to do.
+3. Class E surface areas are fetched and tiled but off by default.
+4. **Opacity has still never been checked against a real sectional since the draw-order
+   fix.** The numbers above are ratios measured against a stand-in ground, which is
+   valid for "does the Class D survive" but says nothing about how it looks over a real
+   chart. Check the live site before touching `CLASSES[].w`.
+5. 1° tiles mean a wide, high-pitch view asks for ~40 files. They are ~20 KB each and
+   fetch six at a time over HTTP/2, so it is fine, but if it ever isn't, the fix is a
+   coarser grid for low zooms rather than a bigger `MAX_BOX`.
+6. The altitude plane (`plane` source, `alt-plane` layer, `updatePlane`, `state.planeOn`)
+   is dead — nothing sets `planeOn` since the control was removed. Left in place rather
+   than widen this change; delete it whenever you are next in `addLayers`.
+
+Done since the last handover: the 17-area Bravo is verified (see above), the `10×`
+references were already gone, and `data/` now cache-busts on `index.json`'s
+`generated` timestamp.
 
 ## Testing
 
@@ -150,4 +222,20 @@ Playwright + Chromium (`--use-gl=swiftshader`), jump the camera to fixed viewpoi
 `window.map` (exposed deliberately), screenshot, and *look*. Assert on
 `state.feats.size` and layer visibility rather than pixels —
 `canvas.toDataURL()`/`drawImage` return blank because MapLibre runs without
-`preserveDrawingBuffer`. I wasted a debugging cycle on that.
+`preserveDrawingBuffer`. I wasted a debugging cycle on that. `page.screenshot()` *does*
+capture the WebGL canvas, so screenshots are the way to read pixels.
+
+`window.map`, `window.state` and the top-level functions (`refresh`, `buildFC`, …) are
+all reachable from the harness — top-level `function` declarations are already on
+`window` in a classic script. **Do not add `window.refresh = () => refresh()`**: it
+overwrites the global it means to wrap and recurses until the stack blows. I did that,
+and because `loadTiles()` calls `refresh()` inside a `try`, `loadView()` swallowed it
+and quietly fell through to the live FAA path — the visible symptom was a spurious
+"FAA airspace service unavailable".
+
+**Occlusion is measurable without a real basemap.** Render the same frame four ways
+(D+B / B only / D only / neither), mask to pixels where a Class D and a Bravo are both
+present, and compare `|both − Bonly|` against `|Donly − neither|`. That ratio is "how
+much of the Class D's own contrast survives the Bravo", and being a ratio it does not
+care what the ground looks like — which is the one opacity-adjacent question a sandbox
+*can* answer honestly. Absolute appearance still needs the real sectional.
