@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[-94.4436,42.4242],[-94.5564,41.9464],[-95.7675,42.0608],[-95.822,42.3467],[-94.4436,42.4242]]]},"properties":{"cls":"SUA","low":8000,"high":18000,"agl":0,"open":0,"name":"CRYPT SOUTH MOA · MOA","hours":"0930 - 1100, 1400 - 1530, TUE - SAT; OTHER TIMES BY NOTAM"}}]}

@@ -1,20 +1,28 @@
 #!/usr/bin/env node
 /**
  * Downloads the whole US airspace dataset from the FAA and bakes it into static
- * 5-degree tiles under data/, so the published page never has to touch the FAA's
+ * 1-degree tiles under data/, so the published page never has to touch the FAA's
  * rate-limited ArcGIS service at runtime.
  *
  * Run: node scripts/build-data.mjs
  */
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { simplifyGeometry, countPoints, tileFeatures } from './lib/geom.mjs';
 
 const FAA = 'https://services6.arcgis.com/ssFJjBXIUyZDrSYZ/arcgis/rest/services';
 const CLASS_URL = `${FAA}/Class_Airspace/FeatureServer/0/query`;
 const SUA_URL   = `${FAA}/Special_Use_Airspace/FeatureServer/0/query`;
 const PAGE = 1000;              // well under the service's 2000 maxRecordCount
-const TILE = 5;                 // degrees
+// 1 degree ≈ 60 x 50 NM here, so a viewport pulls a handful of small tiles rather
+// than one enormous one. At 5 degrees the Bay Area meant downloading a 4.2 MB file
+// covering everything from Big Sur to Oregon before a single box could be drawn.
+const TILE = 1;                 // degrees
 const OUT  = 'data';
+// The FAA tessellates arcs to ~5,000 vertices per circle. Simplifying to the 11 m
+// precision the coordinates are rounded to anyway cuts the bake by ~97% and moves
+// no boundary by more than about 13 m. See scripts/lib/geom.mjs.
+const TOL  = 0.00012;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -156,21 +164,6 @@ function normalise(features, kind) {
   return out;
 }
 
-/* ---- tiling ---- */
-const tileKey = (lon, lat) => `${Math.floor(lon / TILE) * TILE}_${Math.floor(lat / TILE) * TILE}`;
-
-function bboxOf(geom) {
-  let x0 = 180, y0 = 90, x1 = -180, y1 = -90;
-  const walk = c => {
-    if (typeof c[0] === 'number') {
-      if (c[0] < x0) x0 = c[0]; if (c[0] > x1) x1 = c[0];
-      if (c[1] < y0) y0 = c[1]; if (c[1] > y1) y1 = c[1];
-    } else c.forEach(walk);
-  };
-  walk(geom.coordinates);
-  return [x0, y0, x1, y1];
-}
-
 const main = async () => {
   console.log('Downloading Class B/C/D…');
   const bcd = await fetchAll(CLASS_URL, "CLASS IN ('B','C','D')", 'class B/C/D');
@@ -186,19 +179,16 @@ const main = async () => {
   ];
   console.log(`\n${feats.length} usable volumes after normalising`);
 
-  // A feature lands in every tile its bbox touches, so a viewport query never
-  // misses a shelf that straddles a tile edge.
-  const tiles = new Map();
+  let before = 0, after = 0;
   for (const f of feats) {
-    const [x0, y0, x1, y1] = bboxOf(f.geometry);
-    for (let lon = Math.floor(x0 / TILE) * TILE; lon <= x1; lon += TILE) {
-      for (let lat = Math.floor(y0 / TILE) * TILE; lat <= y1; lat += TILE) {
-        const k = tileKey(lon + 0.001, lat + 0.001);
-        if (!tiles.has(k)) tiles.set(k, []);
-        tiles.get(k).push(f);
-      }
-    }
+    before += countPoints(f.geometry);
+    f.geometry = simplifyGeometry(f.geometry, TOL);
+    after += countPoints(f.geometry);
   }
+  console.log(`Simplified ${before.toLocaleString()} → ${after.toLocaleString()} vertices ` +
+              `(${(100 - after / before * 100).toFixed(1)}% smaller)`);
+
+  const tiles = tileFeatures(feats, TILE);
 
   if (existsSync(OUT)) await rm(OUT, { recursive: true });
   await mkdir(`${OUT}/tiles`, { recursive: true });

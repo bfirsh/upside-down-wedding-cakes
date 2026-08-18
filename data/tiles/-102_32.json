@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[-100.3333,32.9667],[-100.3833,32.55],[-101.95,32.5833],[-101.8833,33.2667],[-100.55,33.2667],[-100.3333,32.9667]]]},"properties":{"cls":"SUA","low":6200,"high":18000,"agl":0,"open":0,"name":"LANCER MOA · MOA","hours":"0900 - 2400, MON - FRI; OTHER TIMES BY NOTAM"}}]}
