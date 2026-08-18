@@ -165,6 +165,16 @@ sectionals. SUA is treated as a status colour, always labelled.
 culling — lowest floors and largest areas win a slot, re-solved every camera frame,
 capped at 40. Format is ceiling/floor in hundreds: `100/15` = 10,000 down to 1,500.
 
+**Cull markers past the horizon.** `map.project()` happily returns a screen position
+for a point beyond the horizon — it just lands in the sky, which is where the stray
+labels floating above the terrain came from (26 airport tags at pitch 66, 42 at
+pitch 80). There is no public "is this over the horizon" call, but the transform has
+to know in order to draw the sky, so `onGround()` asks
+`map.transform.isPointOnMapSurface`, shifting the test point up a few pixels so the
+infinitely-distant pile-up along the horizon line goes too. Cull *before* the 140-marker
+cap, otherwise at high pitch most of the budget is spent on sky. Guard the call — it
+is semi-internal, so fall back to culling nothing if it ever disappears.
+
 **Navigation.** No modal drag toggle — I built one and it was the wrong pattern. Left
 drag pans, right drag orbits, double-click flies in, shift/alt+scroll spin and tilt,
 and there's a compass gizmo bottom-right (absolute dial: grab it anywhere and bearing
@@ -173,7 +183,15 @@ follows your finger) with a tilt bar beside it.
 **Panel is deliberately minimal.** Ben asked twice for fewer options. Removed: shape
 modes, exaggeration, hollow shells, even-opacity, altitude plane, highlight-at-altitude,
 label toggle, airport toggle, camera presets. What survives: class checkboxes, Fill,
-cut-away, search, basemap. The dead `state` flags for the removed features are still in
+cut-away, search, basemap.
+
+**One control per job.** The cut-away used to be a slider labelled "Hide everything
+above" *plus* a separate "Slice the sky here" checkbox that armed it — so dragging the
+slider on its own changed a line of text and nothing else, which reads exactly like a
+broken control. Ben hit this. The slider is now the whole cut-away and its maximum
+(`CLIP_OFF`, 12,000) is the off position; the readout underneath doubles as the hint
+that the control exists. Note the max is off *in effect* (`buildFC` clips at `Infinity`),
+which matters because a few SUA floor as high as 45,000. The dead `state` flags for the removed features are still in
 `app.js` — harmless, but tidy them if you touch that area.
 
 ## Bay Area facts worth knowing
@@ -198,8 +216,8 @@ cut-away, search, basemap. The dead `state` flags for the removed features are s
 
 1. **Is 6× the right constant?** One number at the top of `app.js`.
 2. The cut-away slider ("hide everything above") — Ben questioned whether it earns its
-   place now that see-through works. His call, and more open than before: see-through
-   now genuinely works, so the slider has less to do.
+   place now that see-through works. Still his call, though it is at least honest now
+   that it is a single control.
 3. Class E surface areas are fetched and tiled but off by default.
 4. **Opacity has still never been checked against a real sectional since the draw-order
    fix.** The numbers above are ratios measured against a stand-in ground, which is
