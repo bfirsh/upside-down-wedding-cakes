@@ -123,6 +123,22 @@ Keep rims thin — this is the same trap as the plates. Width is `sqrt(area) × 
 capped at 0.0075°; at the first, wider setting the Bravo's rim was costing a third
 of the light reaching the Class D underneath, measurably.
 
+**Only rim a ceiling you would fly over** (`CEIL_RIM_MAX`, 6,500). All 11 Bay Area
+Bravo shelves share the exact same 10,000 ceiling, so ceiling rims there traced the
+internal partitions of what is really one continuous flat lid — eleven outlines
+carrying no information, and the single biggest source of "there are so many lines I
+can't see what's going on". Class C and D tops stay, because those are surfaces you
+actually cross. Dropping the rest also cut render geometry 600 → 474 features.
+
+**Fade with height, but fade bodies and rims at different rates.** `fadeBody` falls
+to 0.40 by 8,000 and `fadeRim` only to 0.78. The body is fog and can fall away hard
+so you can see through the stack; the rim is the *signal* — it is what draws the
+staircase under the Bravo — so it only dims enough to sit back. I first faded them
+together at one rate: it looked tidy and threw the shape away along with the clutter.
+The test to keep is: *"I like how the lines create the shape."*
+This is free because there is already one layer per floor band — the band is the
+fade step. Ground footprints follow the body's rate.
+
 **Fixed 6× vertical exaggeration (`EXAG` in app.js).** I once made this adapt to view
 width so every frame was individually optimal. It was wrong and was caught
 immediately: zooming changed the *shape of the object he was trying to learn*.
@@ -139,8 +155,12 @@ be *perimeter*-sized, not *area*-sized.
 
 **Per-class opacity weights** (`CLASSES[].w`, multiplied by the `Fill` slider). Class B
 is the big lid you look *through*, so it's thinnest (0.42); Class D is small, low, and
-the thing you're trying to see, so it's densest (0.88). Class D still reads at ~51% of
-the pixel through a Bravo.
+the thing you're trying to see, so it's densest (0.88).
+
+**Fill defaults to 50%, and that number came from looking at the real sectional** —
+which is the one judgement this sandbox cannot make. Do not "restore" it to 100%.
+With 50% fill plus the altitude fade, a Class D under the Bravo keeps **65% of its own
+contrast at pitch 55 and 76% near-plan**, up from 31%/52% at 100% fill.
 
 **Tuning warning.** I tuned opacity twice against a flat pale grey stand-in ground in a
 sandbox (I can't reach FAA tile servers from there) and shipped two versions that were
@@ -218,10 +238,10 @@ which matters because a few SUA floor as high as 45,000. The dead `state` flags 
    earns its place now that see-through works. Still an open call, though it is at least honest now
    that it is a single control.
 3. Class E surface areas are fetched and tiled but off by default.
-4. **Opacity has still never been checked against a real sectional since the draw-order
-   fix.** The numbers above are ratios measured against a stand-in ground, which is
-   valid for "does the Class D survive" but says nothing about how it looks over a real
-   chart. Check the live site before touching `CLASSES[].w`.
+4. Absolute appearance over a real sectional is still only checkable on the
+   live site — the ratios above are measured against a stand-in ground, which answers
+   "does the Class D survive" and nothing about how it looks over a real chart. The
+   50% Fill default came from the real thing; treat it as settled.
 5. 1° tiles mean a wide, high-pitch view asks for ~40 files. They are ~20 KB each and
    fetch six at a time over HTTP/2, so it is fine, but if it ever isn't, the fix is a
    coarser grid for low zooms rather than a bigger `MAX_BOX`.

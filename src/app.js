@@ -56,6 +56,25 @@ function mix(a, b, t) {
 const BANDS = [0, 1500, 2500, 3500, 5000, 7000, 9000, 12000, 1e9];
 // Within one band the same back-to-front rule applies, so the big high lids go last.
 const STACK = ['D', 'E', 'C', 'SUA', 'B'];
+
+/* Everything fades with height: the low stuff is what you are trying to see and
+   what you would actually hit, the high shelves are context. Because there is
+   already one layer per floor band, this costs nothing — the band IS the fade step.
+
+   Bodies and rims fade at different rates on purpose. The body is the fog, so it
+   can fall away hard and let you see through the stack. The rim is the signal —
+   it is what draws the staircase under the Bravo — so it only dims enough to sit
+   back, never enough to stop reading. Fading them together looked tidy and threw
+   away the shape along with the clutter. */
+const fadeBody = alt => 1 - 0.60 * Math.min(1, alt / 8000);
+const fadeRim  = alt => 1 - 0.22 * Math.min(1, alt / 8000);
+
+/* A ceiling rim earns its place when you would fly OVER that ceiling — the top of
+   a Class D or C is a surface you cross all the time. A Bravo's 10,000 lid is not,
+   and drawing it is actively harmful: all 11 Bay Area shelves share that exact
+   ceiling, so their ceiling rims trace the internal partitions of what is really
+   one continuous flat lid. Eleven outlines, no information. */
+const CEIL_RIM_MAX = 6500;
 // ONE fixed vertical scale, deliberately. An earlier version derived this from the
 // view width so every frame was individually optimal — and it was wrong: zooming
 // changed the shape of the thing you were trying to learn. Constancy of the object
@@ -71,7 +90,7 @@ const HOME = { center: [-122.28, 37.56], zoom: 9.05, pitch: 66, bearing: 335 };
 const CLIP_OFF = 12000;
 
 const state = {
-  exag: EXAG, opacity: 1.0, alt: CLIP_OFF,
+  exag: EXAG, opacity: 0.5, alt: CLIP_OFF,
   planeOn: false, labelsOn: true, airportsOn: true, rimsOn: true,
   footOn: true, evenOp: false, clipOn: false,
   snapshot: null,            // data/index.json when a baked dataset is present
@@ -492,7 +511,7 @@ function buildFC() {
     const rim = (z) => feats.push({ type: 'Feature', geometry: f._rib,
       properties: Object.assign({}, p, { rim: 1, base: z - t / 2, top: z + t / 2 }) });
     rim(lo);                                          // floor: the shape that matters
-    if (hi - lo > t * 3) rim(hi);                     // ceiling, if there's room for it
+    if (hi - lo > t * 3 && p.high <= CEIL_RIM_MAX) rim(hi);
   });
   return { type: 'FeatureCollection', features: feats };
 }
@@ -508,8 +527,8 @@ function refresh() {
       map.setLayoutProperty(id, 'visibility', vis);
       map.setPaintProperty(id, 'fill-extrusion-opacity', op);
     };
-    (LAYERS.body[c] || []).forEach(id => set(id, bodyOp(c)));
-    (LAYERS.rim[c]  || []).forEach(id => set(id, state.rimsOn ? rimOp(c) : 0));
+    (LAYERS.body[c] || []).forEach((id, b) => set(id, bodyOp(c, b)));
+    (LAYERS.rim[c]  || []).forEach((id, b) => set(id, state.rimsOn ? rimOp(c, b) : 0));
     if (map.getLayer('as-' + c + '-foot'))
       map.setLayoutProperty('as-' + c + '-foot', 'visibility',
         (CLASSES[c].on && state.footOn) ? 'visible' : 'none');
@@ -662,10 +681,11 @@ function updateLabels() {
 
    Order matters more than any of the paint: see the BANDS comment at the top. */
 
-const bodyOp = c => Math.min(0.55, state.opacity * (state.evenOp ? 1 : CLASSES[c].w));
+const bodyOp = (c, b) =>
+  Math.min(0.55, state.opacity * (state.evenOp ? 1 : CLASSES[c].w)) * fadeBody(BANDS[b] || 0);
 // A rim can afford to be near-solid — it is perimeter x a few hundred metres, so
 // it hides essentially nothing of whatever is underneath it.
-const rimOp  = c => Math.min(0.95, 0.5 + 0.45 * state.opacity);
+const rimOp  = (c, b) => Math.min(0.95, 0.5 + 0.45 * state.opacity) * fadeRim(BANDS[b] || 0);
 
 const LAYERS = { body: {}, rim: {} };
 
@@ -677,7 +697,11 @@ function addLayers() {
       id: 'as-' + c + '-foot', type: 'line', source: 'airspace',
       filter: ['all', ['==', ['get', 'cls'], c], ['==', ['get', 'rim'], 0]],
       layout: { 'line-join': 'round' },
-      paint: { 'line-color': rampFor(c), 'line-width': 1.6, 'line-opacity': 0.9 }
+      paint: { 'line-color': rampFor(c), 'line-width': 1.6,
+               // same fade, so a shelf whose floor is at 8,000 stops shouting from
+               // the ground as loudly as one that starts at the surface
+               'line-opacity': ['interpolate', ['linear'], ['get', 'low'],
+                                0, 0.9, 8000, 0.36] }
     });
     LAYERS.body[c] = [];
     LAYERS.rim[c] = [];
@@ -704,8 +728,8 @@ function addLayers() {
         });
         return id;
       };
-      LAYERS.rim[c].push(layer('r', 1, rimOp(c)));
-      LAYERS.body[c].push(layer('', 0, bodyOp(c)));
+      LAYERS.rim[c].push(layer('r', 1, rimOp(c, b)));
+      LAYERS.body[c].push(layer('', 0, bodyOp(c, b)));
     }
   }
 
