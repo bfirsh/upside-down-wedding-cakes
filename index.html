@@ -376,12 +376,14 @@ const STACK = ['D', 'E', 'C', 'SUA', 'B'];
 const fadeBody = alt => 1 - 0.60 * Math.min(1, alt / 8000);
 const fadeRim  = alt => 1 - 0.22 * Math.min(1, alt / 8000);
 
-/* A ceiling rim earns its place when you would fly OVER that ceiling — the top of
-   a Class D or C is a surface you cross all the time. A Bravo's 10,000 lid is not,
-   and drawing it is actively harmful: all 11 Bay Area shelves share that exact
-   ceiling, so their ceiling rims trace the internal partitions of what is really
-   one continuous flat lid. Eleven outlines, no information. */
-const CEIL_RIM_MAX = 6500;
+/* Rim brightness. Every volume is rimmed the same way, always — I briefly dropped
+   ceiling rims above 6,500 ft on the reasoning that you never fly over a Bravo's
+   lid, and it was a mistake: some boxes had a top line and others didn't, which
+   gives the eye no rule to learn and reads as messier than the density it removed.
+   Consistency of treatment beats per-case cleverness. If it is too busy, dim
+   everything together — that is what these two numbers are for. */
+const RIM_BASE = 0.22;
+const RIM_GAIN = 0.38;
 // ONE fixed vertical scale, deliberately. An earlier version derived this from the
 // view width so every frame was individually optimal — and it was wrong: zooming
 // changed the shape of the thing you were trying to learn. Constancy of the object
@@ -818,7 +820,7 @@ function buildFC() {
     const rim = (z) => feats.push({ type: 'Feature', geometry: f._rib,
       properties: Object.assign({}, p, { rim: 1, base: z - t / 2, top: z + t / 2 }) });
     rim(lo);                                          // floor: the shape that matters
-    if (hi - lo > t * 3 && p.high <= CEIL_RIM_MAX) rim(hi);
+    if (hi - lo > t * 3) rim(hi);                     // ceiling, if there's room for it
   });
   return { type: 'FeatureCollection', features: feats };
 }
@@ -992,7 +994,8 @@ const bodyOp = (c, b) =>
   Math.min(0.55, state.opacity * (state.evenOp ? 1 : CLASSES[c].w)) * fadeBody(BANDS[b] || 0);
 // A rim can afford to be near-solid — it is perimeter x a few hundred metres, so
 // it hides essentially nothing of whatever is underneath it.
-const rimOp  = (c, b) => Math.min(0.95, 0.5 + 0.45 * state.opacity) * fadeRim(BANDS[b] || 0);
+const rimOp  = (c, b) =>
+  Math.min(0.95, RIM_BASE + RIM_GAIN * state.opacity) * fadeRim(BANDS[b] || 0);
 
 const LAYERS = { body: {}, rim: {} };
 
@@ -1004,11 +1007,11 @@ function addLayers() {
       id: 'as-' + c + '-foot', type: 'line', source: 'airspace',
       filter: ['all', ['==', ['get', 'cls'], c], ['==', ['get', 'rim'], 0]],
       layout: { 'line-join': 'round' },
-      paint: { 'line-color': rampFor(c), 'line-width': 1.6,
+      paint: { 'line-color': rampFor(c), 'line-width': 1.2,
                // same fade, so a shelf whose floor is at 8,000 stops shouting from
                // the ground as loudly as one that starts at the surface
                'line-opacity': ['interpolate', ['linear'], ['get', 'low'],
-                                0, 0.9, 8000, 0.36] }
+                                0, 0.55, 8000, 0.20] }
     });
     LAYERS.body[c] = [];
     LAYERS.rim[c] = [];
