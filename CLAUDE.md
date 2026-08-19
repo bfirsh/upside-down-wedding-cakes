@@ -123,12 +123,15 @@ Keep rims thin — this is the same trap as the plates. Width is `sqrt(area) × 
 capped at 0.0075°; at the first, wider setting the Bravo's rim was costing a third
 of the light reaching the Class D underneath, measurably.
 
-**Only rim a ceiling you would fly over** (`CEIL_RIM_MAX`, 6,500). All 11 Bay Area
-Bravo shelves share the exact same 10,000 ceiling, so ceiling rims there traced the
-internal partitions of what is really one continuous flat lid — eleven outlines
-carrying no information, and the single biggest source of "there are so many lines I
-can't see what's going on". Class C and D tops stay, because those are surfaces you
-actually cross. Dropping the rest also cut render geometry 600 → 474 features.
+**Rim every volume the same way, always.** I once dropped ceiling rims above
+6,500 ft, reasoning that you never fly over a Bravo's 10,000 lid and that its 11
+shelves all share that ceiling, so those rims only traced the internal partitions of
+one continuous flat lid. The logic is sound and the result was worse. The verdict
+from testing over the real chart was *"it looks really weird when just some things have lines and some don't — more
+messy and hard to parse."* A rule the eye can't learn costs more than the density it
+removes. **Consistency of treatment beats per-case cleverness** — the same lesson as
+the fixed `EXAG`. If it's too busy, dim everything together via `RIM_BASE`/`RIM_GAIN`,
+which is exactly what those two numbers are for.
 
 **Fade with height, but fade bodies and rims at different rates.** `fadeBody` falls
 to 0.40 by 8,000 and `fadeRim` only to 0.78. The body is fog and can fall away hard
@@ -138,6 +141,9 @@ together at one rate: it looked tidy and threw the shape away along with the clu
 The test to keep is: *"I like how the lines create the shape."*
 This is free because there is already one layer per floor band — the band is the
 fade step. Ground footprints follow the body's rate.
+
+Note a fade is *gradual*, which is why it doesn't trip the consistency problem above:
+every volume still has every line, some are just quieter.
 
 **Fixed 6× vertical exaggeration (`EXAG` in app.js).** I once made this adapt to view
 width so every frame was individually optimal. It was wrong and was caught
