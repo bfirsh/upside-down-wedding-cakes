@@ -75,8 +75,8 @@ const fadeRim  = alt => 1 - 0.22 * Math.min(1, alt / 8000);
    gives the eye no rule to learn and reads as messier than the density it removed.
    Consistency of treatment beats per-case cleverness. If it is too busy, dim
    everything together — that is what these two numbers are for. */
-const RIM_BASE = 0.22;
-const RIM_GAIN = 0.38;
+const RIM_BASE = 0.10;
+const RIM_GAIN = 0.26;
 // ONE fixed vertical scale, deliberately. An earlier version derived this from the
 // view width so every frame was individually optimal — and it was wrong: zooming
 // changed the shape of the thing you were trying to learn. Constancy of the object
