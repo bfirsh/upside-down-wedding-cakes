@@ -133,6 +133,14 @@ removes. **Consistency of treatment beats per-case cleverness** — the same les
 the fixed `EXAG`. If it's too busy, dim everything together via `RIM_BASE`/`RIM_GAIN`,
 which is exactly what those two numbers are for.
 
+They are currently 0.10/0.26, i.e. rim opacity 0.23 at the 50% default — **picked
+from three variants viewed over the real sectional.** Against the sandbox's flat grey
+stand-in that setting looks like it loses the staircase; over an actual chart it does
+not, because the rims are saturated colour against a busy coloured ground rather than
+against neutral grey. This is the trap at the top of this file in miniature: the
+sandbox can rank *relative* changes honestly and cannot judge absolute appearance.
+Don't "restore" these to something that screenshots better here.
+
 **Fade with height, but fade bodies and rims at different rates.** `fadeBody` falls
 to 0.40 by 8,000 and `fadeRim` only to 0.78. The body is fog and can fall away hard
 so you can see through the stack; the rim is the *signal* — it is what draws the
