@@ -3,9 +3,9 @@
 Live: https://bfirsh.github.io/upside-down-wedding-cakes/
 Repo: https://github.com/bfirsh/upside-down-wedding-cakes
 
-A 3D viewer for US airspace, focused on the Bay Area and **KSQL San Carlos**.
-The point is to *understand the shapes*
-of stacked airspace — especially the SFO Class B over the peninsula — not to navigate.
+A 3D viewer for US airspace, focused on the Bay Area and **KSQL San Carlos**. The
+point is to *understand the shapes* of stacked airspace — especially the SFO Class B
+over the peninsula — not to navigate.
 Everything below is hard-won; several of these decisions were made, reversed, and
 re-made, so please read before changing them.
 
