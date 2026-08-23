@@ -168,13 +168,24 @@ above are the replacement — anything you add at a volume's floor or ceiling ha
 be *perimeter*-sized, not *area*-sized.
 
 **Per-class opacity weights** (`CLASSES[].w`, multiplied by the `Fill` slider). Class B
-is the big lid you look *through*, so it's thinnest (0.42); Class D is small, low, and
-the thing you're trying to see, so it's densest (0.88).
+is the big lid you look *through*, so it's thinnest by a long way (0.21); Class D is
+small, low, and the thing you're trying to see, so it's densest (0.65).
 
-**Fill defaults to 50%, and that number came from looking at the real sectional** —
-which is the one judgement this sandbox cannot make. Do not "restore" it to 100%.
-With 50% fill plus the altitude fade, a Class D under the Bravo keeps **65% of its own
-contrast at pitch 55 and 76% near-plan**, up from 31%/52% at 100% fill.
+**Class B's weight is set by accumulation, not by one shelf.** The 17 Bravo areas tile
+the plan, so looking straight down you cross exactly one — but at a shallow angle you
+look sideways through several in a row, and alpha multiplies. At the old 0.42 weight
+and 80% fill that was 0.336 per shelf, i.e. four shelves in the line of sight left
+**19%** of the light and the Bravo simply blanked out whatever was behind it. At 0.21
+it is 0.168 per shelf and four shelves still pass **48%**. If Class B ever "blocks out
+what's behind it" again, that multiplication is why, and `CLASSES.B.w` is the lever —
+not the Fill slider, which moves every class together.
+
+**Fill defaults to 80%, and that number came from looking at the real sectional** —
+which is the one judgement this sandbox cannot make. Do not "restore" it. The weights
+were rebalanced at the same time so 80% reads denser than the old 50% default for
+every class *except* B, which got thinner in absolute terms. Measured, a Class D under
+the Bravo keeps **77% of its own contrast at pitch 55, 73% near-plan, and 92% at
+pitch 78** — that last one being the shallow view where the accumulation used to bite.
 
 **Tuning warning.** I tuned opacity twice against a flat pale grey stand-in ground in a
 sandbox (I can't reach FAA tile servers from there) and shipped two versions that were

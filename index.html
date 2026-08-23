@@ -183,8 +183,8 @@ button.wide.on{background:#ffd24a;border-color:#ffd24a;color:#1a1405}
   <label class="chk"><input type="checkbox" data-cls="SUA" checked><span class="sw" style="background:var(--SUA)"></span>Restricted · MOA <span class="cnt" id="nSUA">–</span></label>
   <label class="chk"><input type="checkbox" data-cls="E"><span class="sw" style="background:var(--E)"></span>Class E surface <span class="cnt" id="nE">–</span></label>
   <div class="ramp"><span>floor SFC</span><i></i><span>10,000</span></div>
-  <div class="sl"><div class="lb"><span>Fill</span><span id="fillV">50%</span></div>
-    <input type="range" id="fill" min="15" max="100" step="1" value="50"></div>
+  <div class="sl"><div class="lb"><span>Fill</span><span id="fillV">80%</span></div>
+    <input type="range" id="fill" min="15" max="100" step="1" value="80"></div>
 
   <h2>Cut away</h2>
   <div class="sl"><div class="lb"><span>Hide everything above</span><span id="altV">off</span></div>
@@ -319,11 +319,11 @@ const MAX_FEATURES = 6000;   // memory guard; past this we reset and reload the 
 // than the chart's dashed blue, which would be indistinguishable from Class B here.
 // SUA is a status colour, not a categorical slot — it always ships with a label.
 const CLASSES = {
-  B:   { on: true,  lo: '#9ecbf5', hi: '#14528f', w: 0.42, label: 'Class B' },
-  C:   { on: true,  lo: '#f0aac4', hi: '#8e2f56', w: 0.68, label: 'Class C' },
-  D:   { on: true,  lo: '#f2cf82', hi: '#8a5b00', w: 0.88, label: 'Class D' },
-  E:   { on: false, lo: '#c3c2b7', hi: '#6b6a63', w: 0.55, label: 'Class E surface' },
-  SUA: { on: true,  lo: '#f2a9a9', hi: '#a32d2c', w: 0.80, label: 'Restricted / MOA' }
+  B:   { on: true,  lo: '#9ecbf5', hi: '#14528f', w: 0.21, label: 'Class B' },
+  C:   { on: true,  lo: '#f0aac4', hi: '#8e2f56', w: 0.52, label: 'Class C' },
+  D:   { on: true,  lo: '#f2cf82', hi: '#8a5b00', w: 0.65, label: 'Class D' },
+  E:   { on: false, lo: '#c3c2b7', hi: '#6b6a63', w: 0.38, label: 'Class E surface' },
+  SUA: { on: true,  lo: '#f2a9a9', hi: '#a32d2c', w: 0.58, label: 'Restricted / MOA' }
 };
 // Within a class, floor altitude drives lightness: low shelves light, high shelves
 // dark. That is what turns a fused blue lump into readable tiers.
@@ -373,7 +373,7 @@ const STACK = ['D', 'E', 'C', 'SUA', 'B'];
    it is what draws the staircase under the Bravo — so it only dims enough to sit
    back, never enough to stop reading. Fading them together looked tidy and threw
    away the shape along with the clutter. */
-const fadeBody = alt => 1 - 0.60 * Math.min(1, alt / 8000);
+const fadeBody = alt => 1 - 0.72 * Math.min(1, alt / 8000);
 const fadeRim  = alt => 1 - 0.22 * Math.min(1, alt / 8000);
 
 /* Rim brightness. Every volume is rimmed the same way, always — I briefly dropped
@@ -399,7 +399,7 @@ const HOME = { center: [-122.28, 37.56], zoom: 9.05, pitch: 66, bearing: 335 };
 const CLIP_OFF = 12000;
 
 const state = {
-  exag: EXAG, opacity: 0.5, alt: CLIP_OFF,
+  exag: EXAG, opacity: 0.8, alt: CLIP_OFF,
   planeOn: false, labelsOn: true, airportsOn: true, rimsOn: true,
   footOn: true, evenOp: false, clipOn: false,
   snapshot: null,            // data/index.json when a baked dataset is present
