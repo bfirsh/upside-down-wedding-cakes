@@ -621,6 +621,14 @@ async function loadTiles() {
   want.forEach(k => state.tilesLoaded.add(k));
   const v = encodeURIComponent(snap.generated || '');   // cache-bust the weekly refresh
   const queue = want.slice();
+  // Draw what has arrived rather than waiting for the whole viewport. Combined
+  // with the nearest-first sort above, the airspace you are actually looking at
+  // appears almost immediately and the horizon fills in behind it. Throttled,
+  // because each refresh re-tessellates every layer.
+  let flushTimer = null;
+  const flush = () => { flushTimer = null; counts(); refresh(); };
+  const scheduleFlush = () => { if (!flushTimer) flushTimer = setTimeout(flush, 400); };
+
   const worker = async () => {
     for (let k; (k = queue.shift()) !== undefined; ) {
       try {
@@ -628,12 +636,14 @@ async function loadTiles() {
         if (!r.ok) throw new Error(r.status);
         const fc = await r.json();
         (fc.features || []).forEach(f => { const h = hydrate(f); state.feats.set(h.key, h); });
+        scheduleFlush();
       } catch (e) {
         state.tilesLoaded.delete(k);   // let a later pass retry it
       }
     }
   };
   await Promise.all(Array.from({ length: Math.min(6, want.length) }, worker));
+  if (flushTimer) clearTimeout(flushTimer);
 
   const when = new Date(snap.generated).toLocaleDateString(undefined,
     { year: 'numeric', month: 'short', day: 'numeric' });
@@ -1054,20 +1064,41 @@ function addLayers() {
   });
 }
 
-/* ================= boot ================= */
-map.on('load', async () => {
+/* ================= boot =================
+   Kick the snapshot fetch off the moment this script parses. MapLibre takes well
+   over a second to fire 'load' (style, first render, basemap), and chaining the
+   index fetch behind it meant nothing was even requested until then — measured at
+   ~2.0s before the first tile went out, on a page that was interactive at 0.3s. */
+const snapshotReady = fetch('data/index.json', { cache: 'no-cache' })
+  .then(r => r.ok ? r.json() : null)
+  .then(j => { if (j && j.tiles && j.features) state.snapshot = j; })
+  .catch(() => { /* no baked data — fall back to the live FAA service */ });
+
+/* And don't wait for the map to fetch the tiles either. The transform is set up in
+   the Map constructor, so viewBox() is answerable straight away — the fetches and
+   the map's own start-up are independent work. refresh() no-ops until the style is
+   up, so anything that lands early is simply drawn when addLayers() has run. */
+const dataReady = snapshotReady.then(() => {
+  if (!state.snapshot) return;
+  try { return loadTiles(); } catch (e) { /* fall through to loadView below */ }
+});
+
+let booted = false;
+async function boot() {
+  if (booted) return;
+  booted = true;
   addLayers();
   makeAirports();
   initGizmo();
-  try {
-    const r = await fetch('data/index.json', { cache: 'no-cache' });
-    if (r.ok) {
-      const j = await r.json();
-      if (j && j.tiles && j.features) state.snapshot = j;
-    }
-  } catch (e) { /* no baked data — use the live FAA service */ }
-  loadView(true);
-});
+  refresh();                 // draw whatever arrived while the map was starting
+  await dataReady;
+  loadView(true);            // fills any gap, or takes the live path if data/ is absent
+}
+// 'style.load' fires as soon as the style is parsed, well before 'load' waits on the
+// first full render. Layers can be added then, so airspace appears as early as the
+// data allows. Keep 'load' as a fallback in case the earlier event ever stops firing.
+map.on('style.load', boot);
+map.on('load', boot);
 
 let moveTimer;
 map.on('moveend', () => {

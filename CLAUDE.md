@@ -61,6 +61,26 @@ RDP runs iteratively, not recursively, because a 5,000-point ring overflows the
 stack; and rings are split at their two most distant vertices before simplifying, so
 the anchor is a real corner rather than an arbitrary start vertex leaving a flat spot.
 
+**Start-up is about chaining, not bytes.** The viewport is only ~0.18 MB, but at a
+60 ms RTT the first airspace took **4.2 s** to appear, and profiling showed
+`data/index.json` was not even *requested* until 2.0 s — everything hung off
+`map.on('load')`, which MapLibre takes well over a second to fire, on a page that is
+interactive at 0.3 s. Three changes took it to **1.6 s**:
+
+1. The snapshot fetch starts when the script parses, not inside `map.on('load')`.
+2. Tiles start fetching as soon as the index lands. `viewBox()` is answerable from
+   the transform the `Map` constructor sets up, and `refresh()` already no-ops until
+   the style is up, so anything arriving early is simply drawn once `addLayers()` runs.
+3. Layers are created on `style.load` rather than `load` — the style is parsed well
+   before the first full render — with `load` kept as a fallback and a `booted` guard,
+   since both fire.
+
+`loadTiles()` also renders progressively instead of awaiting all 42 tiles: it flushes
+on a 400 ms throttle, so with the nearest-first sort the Bay Area appears while the
+horizon is still arriving. Don't tighten that throttle — each flush re-tessellates
+every layer, and at 150 ms the refreshes competed with the fetches and pushed the
+*settle* time out by 2 s even though first paint improved.
+
 ### Five traps in the FAA data — all of these bit me
 
 1. `LOWER_VAL`/`UPPER_VAL` are **numbers** in `Class_Airspace` but **strings** in
