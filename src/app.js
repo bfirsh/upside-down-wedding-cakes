@@ -92,7 +92,7 @@ const HOME = { center: [-122.28, 37.56], zoom: 9.05, pitch: 66, bearing: 335 };
 const CLIP_OFF = 12000;
 
 const state = {
-  exag: EXAG, opacity: 0.8, alt: CLIP_OFF,
+  exag: EXAG, opacity: 1.0, alt: CLIP_OFF,
   planeOn: false, labelsOn: true, airportsOn: true, rimsOn: true,
   footOn: true, evenOp: false, clipOn: false,
   snapshot: null,            // data/index.json when a baked dataset is present

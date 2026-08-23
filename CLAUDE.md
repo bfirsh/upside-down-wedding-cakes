@@ -200,12 +200,13 @@ it is 0.168 per shelf and four shelves still pass **48%**. If Class B ever "bloc
 what's behind it" again, that multiplication is why, and `CLASSES.B.w` is the lever —
 not the Fill slider, which moves every class together.
 
-**Fill defaults to 80%, and that number came from looking at the real sectional** —
-which is the one judgement this sandbox cannot make. Do not "restore" it. The weights
-were rebalanced at the same time so 80% reads denser than the old 50% default for
-every class *except* B, which got thinner in absolute terms. Measured, a Class D under
-the Bravo keeps **77% of its own contrast at pitch 55, 73% near-plan, and 92% at
-pitch 78** — that last one being the shallow view where the accumulation used to bite.
+**Fill defaults to 100%, from looking at the real sectional** — which is the one
+judgement this sandbox cannot make. The per-class weights carry the balance instead
+of the slider: at 100%, Class B is 0.21 per shelf, Class C 0.52, and Class D and SUA
+sit on the `min(0.55, …)` ceiling in `bodyOp`. Note that ceiling means the top of the
+slider is partly inert — above about 85% Fill, Class D and SUA stop responding and
+only B, C and E keep getting denser. That's deliberate (nothing should read as solid),
+but it's why "turn Fill up" eventually stops helping.
 
 **Tuning warning.** I tuned opacity twice against a flat pale grey stand-in ground in a
 sandbox (I can't reach FAA tile servers from there) and shipped two versions that were

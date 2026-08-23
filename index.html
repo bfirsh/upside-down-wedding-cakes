@@ -183,8 +183,8 @@ button.wide.on{background:#ffd24a;border-color:#ffd24a;color:#1a1405}
   <label class="chk"><input type="checkbox" data-cls="SUA" checked><span class="sw" style="background:var(--SUA)"></span>Restricted · MOA <span class="cnt" id="nSUA">–</span></label>
   <label class="chk"><input type="checkbox" data-cls="E"><span class="sw" style="background:var(--E)"></span>Class E surface <span class="cnt" id="nE">–</span></label>
   <div class="ramp"><span>floor SFC</span><i></i><span>10,000</span></div>
-  <div class="sl"><div class="lb"><span>Fill</span><span id="fillV">80%</span></div>
-    <input type="range" id="fill" min="15" max="100" step="1" value="80"></div>
+  <div class="sl"><div class="lb"><span>Fill</span><span id="fillV">100%</span></div>
+    <input type="range" id="fill" min="15" max="100" step="1" value="100"></div>
 
   <h2>Cut away</h2>
   <div class="sl"><div class="lb"><span>Hide everything above</span><span id="altV">off</span></div>
@@ -399,7 +399,7 @@ const HOME = { center: [-122.28, 37.56], zoom: 9.05, pitch: 66, bearing: 335 };
 const CLIP_OFF = 12000;
 
 const state = {
-  exag: EXAG, opacity: 0.8, alt: CLIP_OFF,
+  exag: EXAG, opacity: 1.0, alt: CLIP_OFF,
   planeOn: false, labelsOn: true, airportsOn: true, rimsOn: true,
   footOn: true, evenOp: false, clipOn: false,
   snapshot: null,            // data/index.json when a baked dataset is present
